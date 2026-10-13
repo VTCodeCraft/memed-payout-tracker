@@ -6,4 +6,5 @@ packages:
 ignoredBuiltDependencies:
   - "@parcel/watcher"
   - esbuild
+  - sharp
   - unrs-resolver
