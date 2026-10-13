@@ -1,14 +1,12 @@
 "use client";
 
-import { type FormEvent, useId, useRef, useState } from "react";
-import { flushSync } from "react-dom";
+import { useId, useState } from "react";
 import { Alert } from "@/components/alert";
-import { Button } from "@/components/button";
+import { AuthSubmit } from "@/components/auth-submit";
 import { TextField } from "@/components/text-field";
-import { type FormFeedback, SIGNUP_FIELDS, type SignupForm as SignupValues, authFailure, checkSignup, signUp } from "@/lib/auth";
-import { focusFirstProblem } from "@/lib/focus-first-problem";
+import { SIGNUP_FIELDS, type SignupForm as SignupValues, checkSignup, signUp } from "@/lib/auth";
 import type { Role } from "@/lib/session";
-import { useSlowRequest } from "@/lib/use-slow-request";
+import { useAuthForm } from "@/lib/use-auth-form";
 
 const ROLE_OPTIONS: { role: Role; title: string; description: string }[] = [
   { role: "brand", title: "Brand", description: "Run campaigns with a budget and milestone payouts." },
@@ -17,46 +15,15 @@ const ROLE_OPTIONS: { role: Role; title: string; description: string }[] = [
 
 export function SignupForm() {
   const [values, setValues] = useState<SignupValues>({ name: "", email: "", password: "", role: "" });
-  const [feedback, setFeedback] = useState<FormFeedback>({ fields: {} });
-  const [pending, setPending] = useState(false);
-  // Set synchronously, unlike state: a second submit in the same task (before React has
-  // re-rendered the disabled button) still sees it and stops.
-  const inFlight = useRef(false);
-  const slow = useSlowRequest(pending);
+  const { feedback, pending, slow, handleSubmit } = useAuthForm({
+    fields: SIGNUP_FIELDS,
+    values,
+    check: checkSignup,
+    submit: signUp,
+  });
   const roleErrorId = useId();
 
   const update = (field: keyof SignupValues, value: string) => setValues((current) => ({ ...current, [field]: value }));
-
-  // flushSync renders the messages before focus moves, so screen readers announce them.
-  function show(form: HTMLFormElement, next: FormFeedback) {
-    flushSync(() => setFeedback(next));
-    focusFirstProblem(form, SIGNUP_FIELDS, next.fields);
-  }
-
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (inFlight.current) return;
-    const form = event.currentTarget;
-
-    const checked = checkSignup(values);
-    if ("problems" in checked) {
-      show(form, { fields: checked.problems });
-      return;
-    }
-
-    inFlight.current = true;
-    setFeedback({ fields: {} });
-    setPending(true);
-    try {
-      // On success the stored session makes the (auth) layout open the dashboard, so
-      // the button stays disabled until the page changes.
-      await signUp(checked.input);
-    } catch (error) {
-      inFlight.current = false;
-      setPending(false);
-      show(form, authFailure(error, SIGNUP_FIELDS));
-    }
-  }
 
   const roleError = feedback.fields.role;
 
@@ -129,15 +96,7 @@ export function SignupForm() {
 
       {feedback.message && <Alert>{feedback.message}</Alert>}
 
-      <div>
-        <Button type="submit" disabled={pending} className="w-full">
-          {pending ? "Creating account…" : "Create account"}
-        </Button>
-        {/* Always rendered: a live region must exist before its text changes to be announced. */}
-        <p role="status" className="mt-2 text-sm text-muted">
-          {slow ? "Still working. The server sleeps when idle and can take up to a minute to wake up." : ""}
-        </p>
-      </div>
+      <AuthSubmit label="Create account" pendingLabel="Creating account…" pending={pending} slow={slow} />
     </form>
   );
 }
