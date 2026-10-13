@@ -4,16 +4,17 @@ import { useState } from "react";
 import { Alert } from "@/components/alert";
 import { AuthSubmit } from "@/components/auth-submit";
 import { TextField } from "@/components/text-field";
-import { LOGIN_FIELDS, type LoginForm as LoginValues, checkLogin, logIn } from "@/lib/auth";
-import { useAuthForm } from "@/lib/use-auth-form";
+import { LOGIN_FIELDS, type LoginForm as LoginValues, authFailure, checkLogin, logIn } from "@/lib/auth";
+import { useFormSubmit } from "@/lib/use-form-submit";
 
 export function LoginForm() {
   const [values, setValues] = useState<LoginValues>({ email: "", password: "" });
-  const { feedback, pending, slow, handleSubmit } = useAuthForm({
+  const { feedback, pending, slow, handleSubmit } = useFormSubmit({
     fields: LOGIN_FIELDS,
     values,
     check: checkLogin,
     submit: logIn,
+    describeFailure: (error) => authFailure(error, LOGIN_FIELDS),
   });
 
   const update = (field: keyof LoginValues, value: string) => setValues((current) => ({ ...current, [field]: value }));

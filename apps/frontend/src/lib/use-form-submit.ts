@@ -1,20 +1,22 @@
 import { type FormEvent, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { type FieldProblems, type FormFeedback, authFailure } from "./auth.ts";
+import type { FieldProblems, FormFeedback } from "./auth.ts";
 import { focusFirstProblem } from "./focus-first-problem.ts";
 import { useSlowRequest } from "./use-slow-request.ts";
 
-interface AuthFormOptions<Values, Input> {
-  /** Field names in screen order, for mapping API errors and moving focus. */
+interface FormSubmitOptions<Values, Input> {
+  /** Field names in screen order, for moving focus to the first problem. */
   fields: readonly string[];
   values: Values;
   check: (values: Values) => { input: Input } | { problems: FieldProblems };
-  /** Calls the API and stores the session; the (auth) layout then leaves the page. */
+  /** Sends the checked input to the API and handles success. */
   submit: (input: Input) => Promise<unknown>;
+  /** Turns a failed submit into field messages and/or a message for the whole form. */
+  describeFailure: (error: unknown) => FormFeedback;
 }
 
-/** Submission for the login and signup forms: checks, one request at a time, and feedback. */
-export function useAuthForm<Values, Input>({ fields, values, check, submit }: AuthFormOptions<Values, Input>) {
+/** Submission for a form: client checks, one request at a time, and feedback with focus. */
+export function useFormSubmit<Values, Input>({ fields, values, check, submit, describeFailure }: FormSubmitOptions<Values, Input>) {
   const [feedback, setFeedback] = useState<FormFeedback>({ fields: {} });
   const [pending, setPending] = useState(false);
   // Set synchronously, unlike state: a second submit in the same task (before React has
@@ -43,13 +45,12 @@ export function useAuthForm<Values, Input>({ fields, values, check, submit }: Au
     setFeedback({ fields: {} });
     setPending(true);
     try {
-      // Success stores a session, and the layout leaves the page; the button stays
-      // disabled until then.
       await submit(checked.input);
     } catch (error) {
+      show(form, describeFailure(error));
+    } finally {
       inFlight.current = false;
       setPending(false);
-      show(form, authFailure(error, fields));
     }
   }
 

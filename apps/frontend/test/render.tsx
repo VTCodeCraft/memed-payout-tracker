@@ -27,3 +27,13 @@ export async function click(element: Element | null | undefined) {
   if (!(element instanceof HTMLElement)) throw new Error("click needs an element");
   await act(async () => element.click());
 }
+
+/** Types into a controlled input the way a browser does: React only sees native input events. */
+export async function typeInto(input: Element | null | undefined, value: string) {
+  if (!(input instanceof HTMLInputElement)) throw new Error("typeInto needs an <input>");
+  const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+  await act(async () => {
+    setValue?.call(input, value);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
