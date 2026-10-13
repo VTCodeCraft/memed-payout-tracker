@@ -3,7 +3,7 @@ import { createApp } from '../../src/app';
 
 describe('GET /api/health', () => {
   it('responds 200 with an ok status', async () => {
-    const res = await request(createApp()).get('/api/health');
+    const res = await request(createApp({ corsOrigins: [] })).get('/api/health');
 
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toMatch(/application\/json/);
@@ -11,7 +11,7 @@ describe('GET /api/health', () => {
   });
 
   it('does not advertise the framework', async () => {
-    const res = await request(createApp()).get('/api/health');
+    const res = await request(createApp({ corsOrigins: [] })).get('/api/health');
 
     expect(res.headers['x-powered-by']).toBeUndefined();
   });
