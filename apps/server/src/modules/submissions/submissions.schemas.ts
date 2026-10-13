@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { objectId, requiredString } from '../../lib/validation';
+import { objectId, requiredNumber, requiredString } from '../../lib/validation';
 import { normalizePostUrl } from './post-url';
 
 // Unknown keys (creatorId, views, payouts...) are stripped: the creator comes from
@@ -21,3 +21,9 @@ export const createSubmissionSchema = z
     }
     return { campaignId, postUrl, ...post };
   });
+
+// The view-update endpoint has no role check (per the brief), so only `views` is
+// ever read from the body; payout fields and anything else are stripped.
+export const updateViewsSchema = z.object({
+  views: requiredNumber().int('must be a whole number').min(0, 'cannot be negative'),
+});
