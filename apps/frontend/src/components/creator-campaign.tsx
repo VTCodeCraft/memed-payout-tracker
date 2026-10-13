@@ -73,8 +73,8 @@ export function CreatorCampaign({ id }: { id: string }) {
       {back}
       <CampaignSummary campaign={details} />
 
-      <div className="mt-10 grid items-start gap-6 lg:grid-cols-2">
-        <Card>
+      <div className="mt-10 flex flex-col gap-10">
+        <Card className="max-w-2xl">
           <h2 className="text-xl font-semibold tracking-tight">Submit a post</h2>
           {details.status === "live" ? (
             <div className="mt-4">
