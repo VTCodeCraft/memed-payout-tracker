@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { mongo } from 'mongoose';
+import { isDuplicateKeyError } from '../../db/errors';
 import { AppError } from '../../lib/app-error';
 import { type JwtConfig, signAccessToken } from '../../lib/jwt';
 import { hashPassword, verifyPassword } from '../../lib/password';
@@ -10,8 +10,6 @@ export interface AuthResult {
   token: string;
   user: PublicUser;
 }
-
-const DUPLICATE_KEY = 11000;
 
 // Checked against when the email is unknown, so every failed login costs one bcrypt
 // comparison and response time does not reveal which emails are registered.
@@ -25,7 +23,7 @@ export async function signup(input: SignupInput, jwtConfig: JwtConfig): Promise<
     user = await User.create({ name: input.name, email: input.email, role: input.role, passwordHash });
   } catch (error) {
     // The unique index decides, so two concurrent signups cannot both succeed.
-    if (error instanceof mongo.MongoServerError && error.code === DUPLICATE_KEY) {
+    if (isDuplicateKeyError(error)) {
       throw new AppError(409, 'EMAIL_TAKEN', 'An account with this email already exists');
     }
     throw error;
