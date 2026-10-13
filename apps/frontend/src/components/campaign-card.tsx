@@ -7,16 +7,16 @@ import { type Campaign, PLATFORM_LABELS, STATUS_LABELS } from "@/lib/campaigns";
 import { formatDate } from "@/lib/format";
 
 /**
- * One campaign on the brand dashboard: everything the list response already contains.
- * The name links to the campaign's page, which adds its submissions.
+ * One campaign in a list: everything the list response already contains. The name links
+ * to `href`, the campaign's page for the viewer's role.
  */
-export function CampaignCard({ campaign }: { campaign: Campaign }) {
+export function CampaignCard({ campaign, href }: { campaign: Campaign; href: string }) {
   return (
     <Card className="flex h-full flex-col gap-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-xl font-semibold tracking-tight">
-            <Link href={`/brand/campaigns/${campaign.id}`} className="underline-offset-4 hover:underline">
+            <Link href={href} className="underline-offset-4 hover:underline">
               {campaign.name}
             </Link>
           </h2>

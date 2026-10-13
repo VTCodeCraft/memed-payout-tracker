@@ -97,7 +97,7 @@ export default function BrandDashboard() {
           <ul className="grid gap-6 lg:grid-cols-2">
             {campaigns.map((campaign) => (
               <li key={campaign.id}>
-                <CampaignCard campaign={campaign} />
+                <CampaignCard campaign={campaign} href={`/brand/campaigns/${campaign.id}`} />
               </li>
             ))}
           </ul>
