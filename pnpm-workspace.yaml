@@ -1,2 +1,9 @@
 packages:
   - "apps/*"
+
+# Install scripts intentionally skipped: these packages ship prebuilt
+# platform binaries via optional dependencies, verified working without them.
+ignoredBuiltDependencies:
+  - "@parcel/watcher"
+  - esbuild
+  - unrs-resolver
