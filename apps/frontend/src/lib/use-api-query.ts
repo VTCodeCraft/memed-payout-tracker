@@ -7,22 +7,26 @@ export type QueryState<T> =
   | { status: "error"; error: ApiError }
   | { status: "success"; data: T };
 
+type Session = Pick<SignedIn, "token" | "expire">;
+
 /**
- * GETs `endpoint` with the signed-in user's token, and again after retry(). A 401 means
- * the token is no longer accepted, so it ends the session (the layout then sends the user
- * to log in) instead of showing an error. Results are kept per request, so a retry or a
- * new endpoint shows "loading" rather than the previous request's data or error.
+ * Runs `load` with the signed-in user's token, and again after retry() or when `key`
+ * changes. A 401 means the token is no longer accepted, so it ends the session (the layout
+ * then sends the user to log in) instead of showing an error. Results are kept per
+ * request, so a retry or a new key shows "loading" rather than the previous result.
  */
-export function useApiQuery<T>(endpoint: string, { token, expire }: Pick<SignedIn, "token" | "expire">) {
+export function useQuery<T>(key: string, load: (token: string, signal: AbortSignal) => Promise<T>, { token, expire }: Session) {
   const [attempt, setAttempt] = useState(0);
-  const [result, setResult] = useState<{ key: string; state: QueryState<T> } | null>(null);
-  const key = `${attempt} ${token} ${endpoint}`;
+  const [result, setResult] = useState<{ request: string; state: QueryState<T> } | null>(null);
+  const request = `${attempt} ${token} ${key}`;
   const onUnauthorized = useEffectEvent(expire);
+  // The latest `load` runs, but only a new request (key, token or retry) starts one.
+  const run = useEffectEvent(load);
 
   useEffect(() => {
     const controller = new AbortController();
-    apiRequest<T>(endpoint, { token, signal: controller.signal }).then(
-      (data) => setResult({ key, state: { status: "success", data } }),
+    run(token, controller.signal).then(
+      (data) => setResult({ request, state: { status: "success", data } }),
       (error: unknown) => {
         if (controller.signal.aborted) return;
         if (error instanceof ApiError && error.status === 401) {
@@ -31,12 +35,17 @@ export function useApiQuery<T>(endpoint: string, { token, expire }: Pick<SignedI
         }
         if (!(error instanceof ApiError)) console.error(error);
         const failure = error instanceof ApiError ? error : new ApiError(0, "UNEXPECTED_RESPONSE", "Something went wrong.");
-        setResult({ key, state: { status: "error", error: failure } });
+        setResult({ request, state: { status: "error", error: failure } });
       },
     );
     return () => controller.abort();
-  }, [key, endpoint, token]);
+  }, [request, token]);
 
-  const state: QueryState<T> = result?.key === key ? result.state : { status: "loading" };
+  const state: QueryState<T> = result?.request === request ? result.state : { status: "loading" };
   return { state, retry: () => setAttempt((count) => count + 1) };
+}
+
+/** GETs one API endpoint; see useQuery. */
+export function useApiQuery<T>(endpoint: string, session: Session) {
+  return useQuery(endpoint, (token, signal) => apiRequest<T>(endpoint, { token, signal }), session);
 }
