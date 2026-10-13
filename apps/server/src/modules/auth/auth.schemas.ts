@@ -1,12 +1,10 @@
 import { z } from 'zod';
+import { requiredString } from '../../lib/validation';
 import { ROLES } from '../../models/user.model';
 
 // bcrypt only reads the first 72 bytes of a password, so longer ones are rejected
 // rather than silently truncated.
 const BCRYPT_MAX_PASSWORD_BYTES = 72;
-
-const requiredString = () =>
-  z.string({ error: (issue) => (issue.input === undefined ? 'is required' : 'must be a string') });
 
 const email = requiredString()
   .trim()
