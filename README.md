@@ -1,0 +1,272 @@
+# Meme'd Campaign Payout Tracker
+
+Brands run campaigns with a budget and a **milestone ladder** (for example 10,000 views → ₹500, 50,000 → ₹2,000, 1,00,000 → ₹5,000). Creators post for those campaigns on Instagram or YouTube and submit the links. As a post's views are reported, it earns the payout of the **highest milestone it has reached**, and the campaign pays that out until its budget runs out, never beyond it.
+
+- **Live app:** https://memed-payout-tracker-livid.vercel.app
+- **API:** https://memed-payout-tracker-95ju.onrender.com (health check: [`/api/health`](https://memed-payout-tracker-95ju.onrender.com/api/health))
+
+The API runs on Render's free tier and sleeps when idle: the first request after a quiet spell can take up to a minute. Open the health check first before a demo.
+
+**Contents:** [Try it](#try-it) · [Features](#features) · [Architecture](#architecture) · [Run it locally](#run-it-locally) · [Tests](#tests-and-checks) · [API reference](#api-reference) · [Payout rules](#payout-rules) · [Decisions](#decisions-and-assumptions) · [Deployment](#deployment) · [Limitations](#limitations)
+
+## Try it
+
+1. Sign up as a **brand**, choose **Create campaign**, and give it a budget and a ladder.
+2. In another browser (or after logging out), sign up as a **creator**, open the campaign from **Live campaigns**, and submit a link to one Instagram post or reel, or a YouTube video, matching the campaign's platform.
+3. Views are simulated: there is no button for them. Report a view count with the [`PATCH` example below](#simulate-view-updates). The creator's **My earnings** page and the brand's campaign page then show what was earned, paid and left unfunded.
+
+## Features
+
+- **Accounts:** sign up and log in as a brand or a creator; passwords hashed with bcrypt; JWT access tokens (7 days by default).
+- **Brands:** create Instagram or YouTube campaigns with a total budget and a ladder of 1–10 milestones; see each campaign's budget, spent and remaining, and every post submitted to it with its views, eligible payout and paid amount.
+- **Creators:** browse live campaigns; submit post links (the API normalises them, rejects other platforms and refuses the same post twice); see their posts and an earnings summary of paid, eligible and unfunded amounts.
+- **Payouts:** a simulated view-update endpoint; payouts by highest milestone reached; never paying the same milestone twice; partial payouts when the budget is short; campaigns marked exhausted when their budget reaches zero.
+- **Safety:** role checks on every endpoint, brands limited to their own campaigns, creators to their own submissions and earnings; payout updates are transactional and safe under concurrent requests (see [Architecture](#architecture)).
+
+## Architecture
+
+```mermaid
+flowchart LR
+  subgraph Clients
+    UI["Next.js app (Vercel)<br/>brand and creator pages"]
+    Feed["View feed (simulated)<br/>curl or any HTTP client"]
+  end
+  subgraph API["Express API (Render)"]
+    Auth["JWT auth + role checks"]
+    Routes["Routes: auth, campaigns, submissions"]
+    Engine["Payout engine<br/>eligiblePayout · allocatePayout"]
+  end
+  DB[("MongoDB Atlas<br/>replica set")]
+  UI -- "JSON, Authorization: Bearer" --> Auth --> Routes
+  Feed -- "PATCH /api/submissions/:id/views" --> Routes
+  Routes --> Engine
+  Routes -- "Mongoose; view updates in a transaction" --> DB
+  subgraph Tests
+    T1["Unit: payout engine, validation, frontend logic"]
+    T2["Component: React pages in happy-dom"]
+    T3["API integration: supertest + in-memory MongoDB replica set"]
+    T4["Browser E2E: Playwright + built app + real API"]
+  end
+```
+
+| Part | Technology |
+|---|---|
+| Frontend | Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS 4 |
+| API | Node.js 22, Express 5, TypeScript, zod validation |
+| Database | MongoDB (Atlas in production) with Mongoose 9 |
+| Auth | JWT (HS256) in a Bearer header; bcrypt password hashes |
+| Tests | Jest + supertest + mongodb-memory-server (API); `node --test` + happy-dom (frontend); Playwright (browser) |
+| Tooling | pnpm workspaces, Turborepo |
+
+**Request flow.** The browser calls the API directly with the JWT in an `Authorization: Bearer` header (the API sets no cookies). Each route checks the token and role, validates the body with zod, and answers JSON; errors always have the shape `{ "error": { "code", "message", "details"? } }`.
+
+**Why view updates use a transaction.** One update changes two documents: the submission's paid amount and the campaign's spend. They must change together, and two updates competing for the same budget must not both spend it. `recordViews()` reads both inside a MongoDB transaction (snapshot reads, majority writes), computes the payout, and writes both with conditions on the values it read; a conflicting concurrent change makes the transaction retry (up to 3 times, then `409 CONCURRENT_UPDATE`). The API tests send ten identical updates at once and several posts competing for one budget, and check that nothing is paid twice and spend never exceeds the budget. Transactions need a replica set, which is why local MongoDB must be one (below).
+
+Frontend structure, session handling and route protection are described in [`apps/frontend/ARCHITECTURE.md`](apps/frontend/ARCHITECTURE.md).
+
+```
+apps/server     Express API (src/modules: auth, campaigns, submissions, payouts) and its Jest tests
+apps/frontend   Next.js app (src/app routes, src/components, src/lib) and its unit/component tests
+apps/e2e        Playwright browser tests and the scripts that start the app for them
+```
+
+## Run it locally
+
+**Prerequisites:** Node.js 22 (see `.nvmrc`) and pnpm 10.34.6. With Corepack, `corepack enable` picks up the pinned pnpm from `package.json`. You also need a MongoDB **replica set** (next section).
+
+```bash
+pnpm install --frozen-lockfile
+```
+
+### MongoDB
+
+The API needs a MongoDB that is a replica set, because view updates run in transactions. On a standalone MongoDB the app starts and most pages work, but the first view update fails with `500 INTERNAL_ERROR`.
+
+- **Atlas (simplest):** a free cluster is already a replica set. Create a database user, allow your IP, and use its `mongodb+srv://…` connection string with a database name, e.g. `/memed_dev`.
+- **Local MongoDB:** start a single-node replica set and initiate it once:
+  ```bash
+  mkdir data
+  mongod --replSet rs0 --dbpath ./data --port 27017
+  mongosh --eval "rs.initiate()"     # in a second terminal, once
+  ```
+  then use `MONGODB_URI=mongodb://127.0.0.1:27017/memed_dev?replicaSet=rs0`.
+
+Databases are kept apart by name: `memed_dev` for local development, `memed_prod` on Render, and the tests never touch either: they start their own throwaway in-memory replica sets (`memed_test` for API tests, `memed_e2e` for browser tests).
+
+### Environment variables
+
+Copy `apps/server/.env.example` to `apps/server/.env` (the server reads it at startup) and, if needed, `apps/frontend/.env.example` to `apps/frontend/.env.local`. Never commit either.
+
+| Variable | Where | Required | Meaning |
+|---|---|---|---|
+| `MONGODB_URI` | server | yes | `mongodb://` or `mongodb+srv://` URI that names a database |
+| `JWT_SECRET` | server | yes | At least 32 random characters; the `.env.example` placeholder is refused |
+| `JWT_EXPIRES_IN` | server | no | Token lifetime such as `7d`, `12h` (default `7d`) |
+| `PORT` | server | no | Default `4000` |
+| `NODE_ENV` | server | no | `development` (default), `test` or `production` |
+| `CORS_ORIGINS` | server | in production | Comma-separated browser origins; in development defaults to `http://localhost:3000,http://localhost:3001` |
+| `NEXT_PUBLIC_API_URL` | frontend | no locally | API origin, default `http://localhost:4000`; inlined at build time, so rebuild after changing it |
+
+The server validates these at startup and refuses to start with a clear message (naming the variable, never echoing its value). The tests need no environment variables.
+
+### Start
+
+```bash
+pnpm dev
+```
+
+This starts the API on http://localhost:4000 and the frontend on http://localhost:3000. If port 3000 is taken, Next.js moves to the next free port and prints it; the API's development CORS default allows 3000 and 3001, so set `CORS_ORIGINS` if the frontend ends up elsewhere.
+
+## Tests and checks
+
+```bash
+pnpm test        # API unit + integration, frontend unit + component
+pnpm typecheck
+pnpm lint
+pnpm build
+pnpm e2e         # browser tests (separate: needs a browser, takes about a minute)
+```
+
+| Layer | What it proves | Count |
+|---|---|---|
+| API unit (`apps/server/tests/unit`) | Payout engine, ladder rules, URL normalisation, validation schemas, env checks | 156 |
+| API integration (`apps/server/tests/integration`) | Every endpoint over HTTP against an in-memory MongoDB replica set: auth, roles, ownership, payouts, partial payouts, exhaustion, concurrency, the whole brand-to-creator workflow | 178 |
+| Frontend unit (`apps/frontend/src/**/*.test.ts`) | API client, session store, route decisions, form checks, formatting | 75 |
+| Frontend component (`apps/frontend/src/**/*.test.tsx`) | React pages rendered in happy-dom with `fetch` stubbed: loading, empty, error, retry, validation, duplicate submits | 52 |
+| Browser E2E (`apps/e2e/tests`) | Real Chromium against a production build and the real API on a throwaway database: the full workflow, route protection, reloads, expired sessions, cross-tab logout, isolation, network failures | 9 |
+
+The first API test run downloads a MongoDB binary for the in-memory database. On a new machine, install Playwright's browser once before `pnpm e2e`:
+
+```bash
+pnpm --filter e2e exec playwright install chromium
+```
+
+`pnpm e2e` builds the API and the frontend (pointed at `http://localhost:4100`), starts them on ports 4100 and 3100 (which must be free), runs the tests, and stops them. The browser tests run locally only; there is no CI pipeline. Checks of the deployed site (production configuration, the live workflow against Atlas) were done by hand and are not automated.
+
+## API reference
+
+Base path `/api`. Send JSON with `Content-Type: application/json`; authenticated endpoints need `Authorization: Bearer <token>`. Responses are JSON. Money is whole rupees.
+
+| Method and path | Who | Request | Response |
+|---|---|---|---|
+| `GET /health` | anyone | | `200 { status, database, uptime }`, or `503` when the database is disconnected |
+| `POST /auth/signup` | anyone | `{ name, email, password, role }` | `201 { token, user }` |
+| `POST /auth/login` | anyone | `{ email, password }` | `200 { token, user }` |
+| `GET /auth/me` | signed in | | `200 { user }` |
+| `POST /campaigns` | brand | `{ name, platform, totalBudget, milestones: [{ views, payout }] }` | `201 { campaign }` |
+| `GET /campaigns/mine` | brand | | `200 { campaigns }`, own campaigns, newest first |
+| `GET /campaigns/live` | creator | | `200 { campaigns }`, every live campaign, newest first |
+| `GET /campaigns/:id` | brand (own) or creator | | `200 { campaign }` |
+| `GET /campaigns/:id/submissions` | brand (own) | | `200 { submissions }` |
+| `POST /submissions` | creator | `{ campaignId, postUrl }` | `201 { submission }` |
+| `GET /submissions/mine` | creator | | `200 { submissions }`, own posts, newest first |
+| `GET /submissions/earnings` | creator | | `200 { earnings: { totalPaid, totalEligible, totalUnfunded, submissionCount } }` |
+| `PATCH /submissions/:id/views` | anyone (simulated feed) | `{ views }` | `200 { submission, allocation, campaign }` |
+
+- `user`: `{ id, name, email, role, createdAt }`. `campaign`: `{ id, name, platform, totalBudget, spent, remaining, milestones, status, createdAt }` with `status` `live` or `exhausted`. `submission`: `{ id, campaignId, platform, postUrl, normalizedUrl, views, eligiblePayout, paidPayout, createdAt }`.
+- Owner ids are never sent; ownership always comes from the token, and fields a client should not set (`brandId`, `spent`, `status`, payouts) are ignored.
+- Another brand's campaign answers `404`, exactly like a missing one.
+
+**Validation rules.**
+- Signup: name 2–60 characters; a valid email (stored lowercase, unique); password at least 8 characters and at most 72 bytes; role `brand` or `creator`.
+- Campaign: name 1–80 characters; platform `instagram` or `youtube`; whole-rupee budget from 1 to 2,147,483,647; 1–10 milestones whose views and payouts both strictly increase; no payout above the budget. Campaigns cannot be edited after creation.
+- Post link: an `http(s)` link to one Instagram post, reel or IGTV video, or one YouTube video (`watch?v=`, `youtu.be`, Shorts, live or embed links), at most 2,048 characters. It is stored in a canonical form, which must be unique across all campaigns.
+- View count: a whole number, never below the post's current count.
+
+**Error codes.**
+
+| Status | Codes |
+|---|---|
+| 400 | `VALIDATION_ERROR` (with `details: [{ path, message }]`), `INVALID_JSON`, `PLATFORM_MISMATCH` |
+| 401 | `UNAUTHENTICATED`, `INVALID_TOKEN`, `TOKEN_EXPIRED`, `INVALID_CREDENTIALS` |
+| 403 | `FORBIDDEN` (wrong role) |
+| 404 | `NOT_FOUND` |
+| 409 | `EMAIL_TAKEN`, `CAMPAIGN_NOT_LIVE`, `DUPLICATE_POST`, `VIEWS_DECREASED`, `CONCURRENT_UPDATE` |
+| 413 | `PAYLOAD_TOO_LARGE` (bodies over 10 KB) |
+| 429 | `RATE_LIMITED`: signup and login share 20 requests per 15 minutes per client; view updates allow 120 per minute |
+| 500 | `INTERNAL_ERROR` (details only in the server log) |
+
+### Simulate view updates
+
+Views have no UI: report them as the platform feed would. Find a submission's id in the creator's `GET /api/submissions/mine` (or the brand's `GET /api/campaigns/:id/submissions`), then:
+
+```bash
+API=http://localhost:4000   # or https://memed-payout-tracker-95ju.onrender.com
+
+curl -s -X PATCH "$API/api/submissions/<submission-id>/views" \
+  -H "Content-Type: application/json" \
+  -d '{"views": 60000}'
+```
+
+The response reports what happened:
+
+```json
+{
+  "submission": { "id": "<submission-id>", "views": 60000, "eligiblePayout": 2000, "paidPayout": 2000, "...": "..." },
+  "allocation": { "grantedNow": 2000, "unfundedPayout": 0, "outcome": "paid" },
+  "campaign": { "remaining": 4000, "status": "live" }
+}
+```
+
+`outcome` is `paid`, `partial` (the budget covered only part), `budget_exhausted` (nothing left to pay), `no_new_payout` (no new milestone reached) or `no_change` (same count as before; nothing written).
+
+To get a submission id from the command line, sign in as the creator and list their posts:
+
+```bash
+curl -s -X POST "$API/api/auth/login" -H "Content-Type: application/json" \
+  -d '{"email": "<creator-email>", "password": "<creator-password>"}'      # copy "token"
+
+curl -s "$API/api/submissions/mine" -H "Authorization: Bearer <creator-token>"   # copy an "id"
+```
+
+## Payout rules
+
+- A post's **eligible payout** is the payout of the **highest milestone its views have reached** (reaching a threshold exactly counts), not the sum of the milestones it passed.
+- What the post is still **owed** is its eligible payout minus what it has already been paid. A repeated or lower milestone never pays again.
+- The campaign pays what is owed **up to its remaining budget**. If the budget is short, it pays what is left (a **partial payout**) and the rest stays **unfunded**.
+- When spend reaches the budget the campaign becomes **exhausted**: it leaves the live list and accepts no new posts. Views on existing posts are still recorded, so their eligible amount can grow, but nothing more is paid. Budgets cannot be topped up, so unfunded amounts are never paid later.
+- A view count may not decrease (`409 VIEWS_DECREASED`).
+
+**Worked example** (checked against the API): budget ₹6,000, ladder 10,000 → ₹500, 50,000 → ₹2,000, 1,00,000 → ₹5,000, two posts by one creator.
+
+| Update | Eligible | Paid now | Post's total paid | Campaign remaining | Outcome |
+|---|---|---|---|---|---|
+| Post A → 60,000 views | ₹2,000 | ₹2,000 | ₹2,000 | ₹4,000 | `paid` (two milestones crossed, only the higher one pays) |
+| Post A → 60,000 again | ₹2,000 | ₹0 | ₹2,000 | ₹4,000 | `no_change` |
+| Post A → 1,20,000 | ₹5,000 | ₹3,000 | ₹5,000 | ₹1,000 | `paid` (the difference only) |
+| Post B → 1,20,000 | ₹5,000 | ₹1,000 | ₹1,000 | ₹0, exhausted | `partial` (₹4,000 unfunded) |
+| Post B → 1,50,000 | ₹5,000 | ₹0 | ₹1,000 | ₹0 | `budget_exhausted` |
+
+The creator's earnings then read: paid ₹6,000, eligible ₹10,000, unfunded ₹4,000, 2 posts. The campaign has spent exactly its ₹6,000 budget.
+
+## Decisions and assumptions
+
+- **One update crossing several milestones** pays only the highest one reached, minus anything already paid.
+- **Budget running out mid-payout:** the post gets whatever is left (a partial payout); the remainder is recorded as unfunded, not owed later.
+- **Eligible vs paid** are stored separately on each submission, so the gap between what views earned and what the budget covered is always visible.
+- **The view-update endpoint needs no authentication**, as the brief specifies, because it stands in for a platform's data feed. It reads only `views` and is rate-limited.
+- **Duplicate posts** are detected on the canonical link, across all campaigns and creators.
+- **Campaigns are immutable** once created: changing the ladder or budget would change what creators were already promised.
+- **Creators may open any campaign** by id, including exhausted ones, but only ever see their own submissions.
+
+## Deployment
+
+| | Service | Configuration |
+|---|---|---|
+| Frontend | Vercel, project root `apps/frontend` | `NEXT_PUBLIC_API_URL` = the Render API origin |
+| API | Render web service | Build `npx --yes pnpm@10.34.6 install --frozen-lockfile && npx --yes pnpm@10.34.6 --filter server build`; start `node apps/server/dist/index.js`; env `NODE_ENV=production`, `MONGODB_URI` (database `memed_prod`), `JWT_SECRET`, `CORS_ORIGINS` = the Vercel origin |
+| Database | MongoDB Atlas | Replica set; IP allowlist for Render |
+
+These settings live in the Vercel and Render dashboards, not in the repository. Both services deploy from `main`.
+
+## Limitations
+
+- **Views are simulated.** There is no UI to report views and no integration with Instagram or YouTube; submitted posts are not checked to exist. Anyone can call the view-update endpoint (per the brief); it is only rate-limited.
+- **Cold starts:** the free Render instance sleeps when idle; the first request can take up to a minute (the UI says so while it waits).
+- **Rate limits are kept in memory,** per server instance, and reset when it restarts or redeploys.
+- **Sessions:** the JWT is kept in `localStorage` (see the trade-off in `ARCHITECTURE.md`); there is no refresh, revocation or password reset, and logging out only clears the browser.
+- **No editing:** campaigns cannot be edited, paused, deleted or topped up. Lists are not paginated.
+- **Earnings page requests:** submissions carry only a campaign id, so the creator's earnings page fetches each distinct campaign once to show its name.
+- **Tests:** browser tests run locally with Chromium only; there is no CI. Production checks are manual.
+- **Database user:** development and production use one Atlas user with access to both databases; separate users per environment would be safer.
+- **Optional items from the brief that are not implemented:** caching the campaign list in Redis, flagging unusual view spikes, Docker, and a scaling note. Concurrent payout safety, also optional, is implemented and tested.
