@@ -244,4 +244,76 @@ describe('campaign endpoints', () => {
       expect(res.body.error).toEqual({ code: 'FORBIDDEN', message: 'This action requires a creator account' });
     });
   });
+
+  describe('GET /api/campaigns/:id', () => {
+    const detail = (id: string, auth?: string) => {
+      const req = request(app).get(`/api/campaigns/${id}`);
+      return auth === undefined ? req : req.set('Authorization', auth);
+    };
+
+    it('lets a brand open its own campaign', async () => {
+      const acme = await account('brand', 'brand@acme.test');
+      const created = await createAs(acme.auth, 'Acme campaign');
+
+      const res = await detail(created.id, acme.auth);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ campaign: created });
+    });
+
+    it("answers 404 for another brand's campaign without revealing it exists", async () => {
+      const acme = await account('brand', 'brand@acme.test');
+      const globex = await account('brand', 'brand@globex.test');
+      const created = await createAs(acme.auth, 'Acme campaign');
+
+      const res = await detail(created.id, globex.auth);
+
+      expect(res.status).toBe(404);
+      expect(res.body).toEqual({ error: { code: 'NOT_FOUND', message: 'Campaign not found' } });
+    });
+
+    it('lets a creator open live and exhausted campaigns without brand details', async () => {
+      const acme = await account('brand', 'brand@acme.test');
+      const creator = await account('creator', 'creator@memes.test');
+      const created = await createAs(acme.auth, 'Acme campaign');
+
+      const liveRes = await detail(created.id, creator.auth);
+      expect(liveRes.status).toBe(200);
+      expect(liveRes.body).toEqual({ campaign: created });
+      expect(liveRes.text).not.toContain(acme.id);
+
+      await Campaign.updateOne({ _id: created.id }, { $set: { spent: 6_000, status: 'exhausted' } });
+      const exhaustedRes = await detail(created.id, creator.auth);
+      expect(exhaustedRes.status).toBe(200);
+      expect(exhaustedRes.body.campaign).toMatchObject({ status: 'exhausted', spent: 6_000, remaining: 0 });
+    });
+
+    it('answers 404 for a well-formed id that does not exist', async () => {
+      const creator = await account('creator', 'creator@memes.test');
+
+      const res = await detail(new mongoose.Types.ObjectId().toString(), creator.auth);
+
+      expect(res.status).toBe(404);
+      expect(res.body.error.code).toBe('NOT_FOUND');
+    });
+
+    it.each(['not-an-id', '12345', 'zzzzzzzzzzzzzzzzzzzzzzzz'])('rejects malformed id %p with 400', async (id) => {
+      const creator = await account('creator', 'creator@memes.test');
+
+      const res = await detail(id, creator.auth);
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toEqual({
+        code: 'VALIDATION_ERROR',
+        message: 'Request validation failed',
+        details: [{ path: 'id', message: 'must be a valid id' }],
+      });
+    });
+
+    it('returns 401 without a token', async () => {
+      const res = await detail(new mongoose.Types.ObjectId().toString());
+
+      expect(res.status).toBe(401);
+    });
+  });
 });

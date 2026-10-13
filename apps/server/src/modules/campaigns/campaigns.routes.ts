@@ -1,7 +1,8 @@
 import { Router } from 'express';
+import { AppError } from '../../lib/app-error';
 import { getAuthUser, requireAuth, requireRole } from '../../middleware/auth';
 import { Campaign, toCampaignResponse } from '../../models/campaign.model';
-import { createCampaignSchema } from './campaigns.schemas';
+import { campaignParamsSchema, createCampaignSchema } from './campaigns.schemas';
 
 export function createCampaignsRouter(jwtSecret: string): Router {
   const router = Router();
@@ -23,6 +24,19 @@ export function createCampaignsRouter(jwtSecret: string): Router {
   router.get('/live', requireRole('creator'), async (_req, res) => {
     const campaigns = await Campaign.find({ status: 'live' }).sort({ createdAt: -1, _id: -1 });
     res.status(200).json({ campaigns: campaigns.map(toCampaignResponse) });
+  });
+
+  // Creators may open any campaign to read its ladder; brands only their own.
+  // Another brand's campaign answers 404 so its existence is not revealed.
+  router.get('/:id', async (req, res) => {
+    const { id } = campaignParamsSchema.parse(req.params);
+    const user = getAuthUser(req);
+    const campaign = await Campaign.findById(id);
+
+    if (!campaign || (user.role === 'brand' && !campaign.brandId.equals(user.id))) {
+      throw new AppError(404, 'NOT_FOUND', 'Campaign not found');
+    }
+    res.status(200).json({ campaign: toCampaignResponse(campaign) });
   });
 
   return router;

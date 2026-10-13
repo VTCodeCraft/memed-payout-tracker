@@ -8,3 +8,6 @@ export const requiredString = () =>
 
 export const requiredNumber = () =>
   z.number({ error: (issue) => (issue.input === undefined ? 'is required' : 'must be a number') });
+
+/** A 24-character hex MongoDB ObjectId, checked before it can reach a query. */
+export const objectId = () => requiredString().regex(/^[a-f\d]{24}$/i, 'must be a valid id');

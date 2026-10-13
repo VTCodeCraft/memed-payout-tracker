@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { ROLES, type Role } from '../models/user.model';
 import { AppError } from './app-error';
+import { objectId } from './validation';
 
 export interface JwtConfig {
   secret: string;
@@ -30,7 +31,7 @@ export function signAccessToken(user: AuthUser, config: JwtConfig): string {
 }
 
 // sub is a MongoDB ObjectId, so a bad value can never reach a database query.
-const claimsSchema = z.object({ sub: z.string().regex(/^[a-f\d]{24}$/i), role: z.enum(ROLES) });
+const claimsSchema = z.object({ sub: objectId(), role: z.enum(ROLES) });
 
 /**
  * Verifies signature, algorithm and expiry, then validates the claims.
