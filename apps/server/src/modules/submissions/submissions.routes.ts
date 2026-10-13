@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { type RequestHandler, Router } from 'express';
 import { isDuplicateKeyError } from '../../db/errors';
 import { AppError } from '../../lib/app-error';
 import { idParamsSchema } from '../../lib/validation';
@@ -9,7 +9,7 @@ import { recordViews } from '../payouts/record-views';
 import { creatorEarnings } from './earnings';
 import { createSubmissionSchema, updateViewsSchema } from './submissions.schemas';
 
-export function createSubmissionsRouter(jwtSecret: string): Router {
+export function createSubmissionsRouter(jwtSecret: string, viewUpdateLimiter: RequestHandler): Router {
   const router = Router();
   // Applied per route rather than router-wide: the brief's view-update endpoint on
   // this router takes no role check.
@@ -62,7 +62,7 @@ export function createSubmissionsRouter(jwtSecret: string): Router {
 
   // No authentication or role check: the brief defines this endpoint as a simulation
   // of platform view data. Only `views` is read from the body.
-  router.patch('/:id/views', async (req, res) => {
+  router.patch('/:id/views', viewUpdateLimiter, async (req, res) => {
     const { id } = idParamsSchema.parse(req.params);
     const { views } = updateViewsSchema.parse(req.body);
     res.status(200).json(await recordViews(id, views));

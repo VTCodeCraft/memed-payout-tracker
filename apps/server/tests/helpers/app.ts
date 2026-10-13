@@ -7,7 +7,15 @@ export const TEST_JWT: JwtConfig = {
   expiresInSeconds: 3_600,
 };
 
+// High enough that only the rate-limit tests ever see a 429.
+const UNLIMITED = { limit: 1_000_000, windowMs: 60_000 };
+
 /** createApp with test defaults; pass overrides for what a test cares about. */
 export function createTestApp(overrides: Partial<AppOptions> = {}): Express {
-  return createApp({ corsOrigins: [], jwt: TEST_JWT, ...overrides });
+  return createApp({
+    corsOrigins: [],
+    jwt: TEST_JWT,
+    rateLimits: { auth: UNLIMITED, viewUpdates: UNLIMITED },
+    ...overrides,
+  });
 }
