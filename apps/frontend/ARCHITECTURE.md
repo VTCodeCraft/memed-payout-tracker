@@ -30,7 +30,7 @@ The Express API on Render returns the JWT in a JSON body and expects `Authorizat
 | `/creator/campaigns` | creator | `GET campaigns/live`, `POST submissions` | M13 |
 
 - `/brand` and `/creator` each have a layout (`SignedInLayout`) that checks the stored token with `GET auth/me` once per page load, shows nothing protected until it passes, sends other roles to their own home using the API's role, and renders the app shell. The `(auth)` route group holds login and signup and shows them only to signed-out visitors; route groups do not change URLs.
-- Every redirect decision is the pure function `decideAccess()` in `lib/route-guard.ts`, which is unit tested.
+- What a signed-in area shows (loading, a redirect, an error, or the page) is decided by the pure function `decideAccess()` in `lib/route-guard.ts`, which is unit tested. Signed-in visitors on login or signup are sent to their home by `SignedOutOnly`.
 - There is no single-submission endpoint, so submission details come from the list responses. `PATCH submissions/:id/views` returns the updated submission, allocation and campaign remaining.
 
 ## UI states
