@@ -1,5 +1,6 @@
 import cors from 'cors';
 import express, { type Express } from 'express';
+import { errorHandler, notFoundHandler } from './middleware/errors';
 import { healthRouter } from './modules/health/health.routes';
 
 export interface AppOptions {
@@ -21,6 +22,10 @@ export function createApp({ corsOrigins }: AppOptions): Express {
   app.use(express.json({ limit: '10kb' }));
 
   app.use('/api', healthRouter);
+
+  // Registered last: anything unmatched is a 404, and every error becomes JSON.
+  app.use(notFoundHandler);
+  app.use(errorHandler);
 
   return app;
 }
