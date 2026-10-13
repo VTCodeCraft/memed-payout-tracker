@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import type { JwtConfig } from '../../lib/jwt';
+import { getAuthUser, requireAuth } from '../../middleware/auth';
 import { loginSchema, signupSchema } from './auth.schemas';
-import { login, signup } from './auth.service';
+import { getCurrentUser, login, signup } from './auth.service';
 
 export function createAuthRouter(jwtConfig: JwtConfig): Router {
   const router = Router();
@@ -12,6 +13,10 @@ export function createAuthRouter(jwtConfig: JwtConfig): Router {
 
   router.post('/login', async (req, res) => {
     res.status(200).json(await login(loginSchema.parse(req.body), jwtConfig));
+  });
+
+  router.get('/me', requireAuth(jwtConfig.secret), async (req, res) => {
+    res.status(200).json({ user: await getCurrentUser(getAuthUser(req).id) });
   });
 
   return router;

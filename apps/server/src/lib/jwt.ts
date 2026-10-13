@@ -29,7 +29,8 @@ export function signAccessToken(user: AuthUser, config: JwtConfig): string {
   });
 }
 
-const claimsSchema = z.object({ sub: z.string().min(1), role: z.enum(ROLES) });
+// sub is a MongoDB ObjectId, so a bad value can never reach a database query.
+const claimsSchema = z.object({ sub: z.string().regex(/^[a-f\d]{24}$/i), role: z.enum(ROLES) });
 
 /**
  * Verifies signature, algorithm and expiry, then validates the claims.

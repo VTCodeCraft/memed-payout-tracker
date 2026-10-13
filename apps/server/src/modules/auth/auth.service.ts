@@ -46,6 +46,15 @@ export async function login(input: LoginInput, jwtConfig: JwtConfig): Promise<Au
   return authResult(user, jwtConfig);
 }
 
+/** The token's user as currently stored; 401 if the account no longer exists. */
+export async function getCurrentUser(userId: string): Promise<PublicUser> {
+  const user = await User.findById(userId);
+  if (!user) {
+    throw new AppError(401, 'INVALID_TOKEN', 'Invalid authentication token');
+  }
+  return toPublicUser(user);
+}
+
 function authResult(user: UserDocument, jwtConfig: JwtConfig): AuthResult {
   return {
     token: signAccessToken({ id: user.id, role: user.role }, jwtConfig),

@@ -7,6 +7,7 @@ import { errorHandler } from '../../src/middleware/errors';
 import { TEST_JWT } from '../helpers/app';
 
 const { secret } = TEST_JWT;
+const USER_ID = '66f1c0ffee66f1c0ffee66f1';
 
 const app = express()
   .get('/private', requireAuth(secret), (req, res) => {
@@ -20,7 +21,7 @@ const app = express()
   })
   .use(errorHandler);
 
-const tokenFor = (role: 'brand' | 'creator', id = 'user-123') => signAccessToken({ id, role }, TEST_JWT);
+const tokenFor = (role: 'brand' | 'creator', id = USER_ID) => signAccessToken({ id, role }, TEST_JWT);
 const base64url = (value: object) => Buffer.from(JSON.stringify(value)).toString('base64url');
 
 describe('requireAuth', () => {
@@ -28,7 +29,7 @@ describe('requireAuth', () => {
     const res = await request(app).get('/private').set('Authorization', `Bearer ${tokenFor('creator')}`);
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ id: 'user-123', role: 'creator' });
+    expect(res.body).toEqual({ id: USER_ID, role: 'creator' });
   });
 
   it('accepts the Bearer scheme in any letter case', async () => {
@@ -51,7 +52,7 @@ describe('requireAuth', () => {
 
   it('returns 401 TOKEN_EXPIRED for an expired token', async () => {
     const expired = jwt.sign({ role: 'brand', exp: Math.floor(Date.now() / 1000) - 60 }, secret, {
-      subject: 'user-123',
+      subject: USER_ID,
     });
 
     const res = await request(app).get('/private').set('Authorization', `Bearer ${expired}`);
@@ -62,11 +63,12 @@ describe('requireAuth', () => {
 
   it.each([
     ['a malformed token', 'not.a.jwt'],
-    ['a token signed with another secret', jwt.sign({ role: 'brand' }, 'another-secret-that-is-long-enough!!', { subject: 'u' })],
-    ['a token signed with another algorithm', jwt.sign({ role: 'brand' }, secret, { subject: 'u', algorithm: 'HS512' })],
-    ['an unsigned alg:none token', `${base64url({ alg: 'none', typ: 'JWT' })}.${base64url({ sub: 'u', role: 'brand' })}.`],
-    ['a token with an unknown role', jwt.sign({ role: 'admin' }, secret, { subject: 'u' })],
+    ['a token signed with another secret', jwt.sign({ role: 'brand' }, 'another-secret-that-is-long-enough!!', { subject: USER_ID })],
+    ['a token signed with another algorithm', jwt.sign({ role: 'brand' }, secret, { subject: USER_ID, algorithm: 'HS512' })],
+    ['an unsigned alg:none token', `${base64url({ alg: 'none', typ: 'JWT' })}.${base64url({ sub: USER_ID, role: 'brand' })}.`],
+    ['a token with an unknown role', jwt.sign({ role: 'admin' }, secret, { subject: USER_ID })],
     ['a token without a subject', jwt.sign({ role: 'brand' }, secret)],
+    ['a subject that is not an ObjectId', jwt.sign({ role: 'brand' }, secret, { subject: 'user-123' })],
   ])('returns 401 INVALID_TOKEN for %s', async (_label, token) => {
     const res = await request(app).get('/private').set('Authorization', `Bearer ${token}`);
 
@@ -76,7 +78,7 @@ describe('requireAuth', () => {
 
   it('rejects a token whose role claim was tampered with', async () => {
     const [header, , signature] = tokenFor('creator').split('.');
-    const tampered = `${header}.${base64url({ sub: 'user-123', role: 'brand' })}.${signature}`;
+    const tampered = `${header}.${base64url({ sub: USER_ID, role: 'brand' })}.${signature}`;
 
     const res = await request(app).get('/brand-only').set('Authorization', `Bearer ${tampered}`);
 

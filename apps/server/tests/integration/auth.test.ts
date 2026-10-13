@@ -133,4 +133,62 @@ describe('auth endpoints', () => {
       expect(res.body.error.details).toEqual([{ path: 'password', message: 'is required' }]);
     });
   });
+
+  describe('GET /api/auth/me', () => {
+    const me = (token?: string) => {
+      const req = request(app).get('/api/auth/me');
+      return token === undefined ? req : req.set('Authorization', `Bearer ${token}`);
+    };
+
+    it('returns the current public user for a valid token', async () => {
+      const { body: session } = await signup(brand);
+
+      const res = await me(session.token);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ user: session.user });
+      expect(res.text).not.toMatch(/passwordHash|\$2b\$/);
+    });
+
+    it('returns 401 UNAUTHENTICATED without a token', async () => {
+      const res = await me();
+
+      expect(res.status).toBe(401);
+      expect(res.body.error.code).toBe('UNAUTHENTICATED');
+    });
+
+    it('returns 401 INVALID_TOKEN for a token signed with another secret', async () => {
+      const { body: session } = await signup(brand);
+      const forged = jwt.sign({ role: 'brand' }, 'some-other-secret-that-is-long-enough', {
+        subject: session.user.id,
+      });
+
+      const res = await me(forged);
+
+      expect(res.status).toBe(401);
+      expect(res.body.error.code).toBe('INVALID_TOKEN');
+    });
+
+    it('returns 401 TOKEN_EXPIRED for an expired token', async () => {
+      const { body: session } = await signup(brand);
+      const expired = jwt.sign({ role: 'brand', exp: Math.floor(Date.now() / 1000) - 1 }, TEST_JWT.secret, {
+        subject: session.user.id,
+      });
+
+      const res = await me(expired);
+
+      expect(res.status).toBe(401);
+      expect(res.body.error.code).toBe('TOKEN_EXPIRED');
+    });
+
+    it('returns 401 INVALID_TOKEN when the account no longer exists', async () => {
+      const { body: session } = await signup(brand);
+      await User.deleteOne({ _id: session.user.id });
+
+      const res = await me(session.token);
+
+      expect(res.status).toBe(401);
+      expect(res.body.error.code).toBe('INVALID_TOKEN');
+    });
+  });
 });
