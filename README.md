@@ -27,26 +27,14 @@ The API runs on Render's free tier and sleeps when idle: the first request after
 
 ```mermaid
 flowchart LR
-  subgraph Clients
-    UI["Next.js app (Vercel)<br/>brand and creator pages"]
-    Feed["View feed (simulated)<br/>curl or any HTTP client"]
-  end
-  subgraph API["Express API (Render)"]
-    Auth["JWT auth + role checks"]
-    Routes["Routes: auth, campaigns, submissions"]
-    Engine["Payout engine<br/>eligiblePayout · allocatePayout"]
-  end
-  DB[("MongoDB Atlas<br/>replica set")]
-  UI -- "JSON, Authorization: Bearer" --> Auth --> Routes
-  Feed -- "PATCH /api/submissions/:id/views" --> Routes
-  Routes --> Engine
-  Routes -- "Mongoose; view updates in a transaction" --> DB
-  subgraph Tests
-    T1["Unit: payout engine, validation, frontend logic"]
-    T2["Component: React pages in happy-dom"]
-    T3["API integration: supertest + in-memory MongoDB replica set"]
-    T4["Browser E2E: Playwright + built app + real API"]
-  end
+  UI["Next.js app<br/>(Vercel)"] -- "JSON + Bearer JWT" --> API["Express API (Render)<br/>auth · roles · validation"]
+  Feed["Simulated view feed<br/>(curl)"] -- "PATCH /submissions/:id/views" --> API
+  API --> Engine["Payout engine<br/>eligiblePayout · allocatePayout"]
+  API -- "Mongoose; view updates<br/>in a transaction" --> DB[("MongoDB Atlas<br/>replica set")]
+  E2E["Browser E2E<br/>Playwright"] -. "built app + real API" .-> UI
+  Comp["Component tests<br/>happy-dom"] -. "pages, fetch stubbed" .-> UI
+  Integ["API integration<br/>supertest + in-memory MongoDB"] -.-> API
+  Unit["Unit tests"] -.-> Engine
 ```
 
 | Part | Technology |
