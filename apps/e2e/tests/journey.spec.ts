@@ -43,7 +43,7 @@ test("a brand's campaign pays a creator's posts up to its budget, and both see t
   await test.step("a creator signs up, finds the campaign live, and submits two posts", async () => {
     await signUpInBrowser(page, CREATOR);
     await expect(page).toHaveURL("/creator");
-    await page.getByRole("link", { name: "Diwali clips" }).click();
+    await page.getByRole("listitem").filter({ hasText: "Diwali clips" }).getByRole("link", { name: "Open campaign" }).click();
     await expect(page).toHaveURL(`/creator/campaigns/${campaignId}`);
 
     const link = page.getByLabel("Post link");
