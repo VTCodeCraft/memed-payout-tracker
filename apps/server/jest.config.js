@@ -11,4 +11,8 @@ module.exports = {
   roots: ['<rootDir>/tests'],
   testMatch: ['**/*.test.ts'],
   clearMocks: true,
+  // Each integration file starts its own mongod replica set. Jest's default of one
+  // worker per core starts ~15 at once; while they boot, ordinary queries miss the
+  // 5 s test timeout. Four workers is the fastest measured setting and stays reliable.
+  maxWorkers: 4,
 };
