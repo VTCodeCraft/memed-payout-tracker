@@ -6,6 +6,7 @@ import { getAuthUser, requireAuth, requireRole } from '../../middleware/auth';
 import { Campaign } from '../../models/campaign.model';
 import { type SubmissionDocument, Submission, toSubmissionResponse } from '../../models/submission.model';
 import { recordViews } from '../payouts/record-views';
+import { creatorEarnings } from './earnings';
 import { createSubmissionSchema, updateViewsSchema } from './submissions.schemas';
 
 export function createSubmissionsRouter(jwtSecret: string): Router {
@@ -52,6 +53,11 @@ export function createSubmissionsRouter(jwtSecret: string): Router {
   router.get('/mine', ...creatorOnly, async (req, res) => {
     const submissions = await Submission.find({ creatorId: getAuthUser(req).id }).sort({ createdAt: -1, _id: -1 });
     res.status(200).json({ submissions: submissions.map(toSubmissionResponse) });
+  });
+
+  // The brief's "view their total earnings": totals for the token's creator only.
+  router.get('/earnings', ...creatorOnly, async (req, res) => {
+    res.status(200).json({ earnings: await creatorEarnings(getAuthUser(req).id) });
   });
 
   // No authentication or role check: the brief defines this endpoint as a simulation
