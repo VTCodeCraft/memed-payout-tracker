@@ -28,3 +28,11 @@ export const STATUS_LABELS: Record<Campaign["status"], string> = { live: "Live",
 export function spentPercent({ spent, totalBudget }: Pick<Campaign, "spent" | "totalBudget">): number {
   return Math.min(100, Math.round((spent / totalBudget) * 100));
 }
+
+/**
+ * The 1-based number of the highest milestone `views` has reached, or 0 below the first.
+ * Same rule as the API's payout engine: reaching a threshold exactly counts.
+ */
+export function highestMilestone(views: number, milestones: Milestone[]): number {
+  return milestones.filter((milestone) => views >= milestone.views).length;
+}

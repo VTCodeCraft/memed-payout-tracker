@@ -82,6 +82,7 @@ describe("brand dashboard", () => {
     assert.match(first?.textContent ?? "", /Live/);
     assert.match(first?.textContent ?? "", /75% of the budget paid out/);
     assert.match(first?.textContent ?? "", /Created 13 Oct 2026/);
+    assert.equal(first?.querySelector("h2 a")?.getAttribute("href"), `/brand/campaigns/${live.id}`);
 
     const second = cardFor(container, "Launch week");
     assert.deepEqual(

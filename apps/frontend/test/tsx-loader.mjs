@@ -25,7 +25,15 @@ export async function resolve(specifier, context, nextResolve) {
       if (await isFile(url)) return { url: url.href, shortCircuit: true };
     }
   }
-  return nextResolve(specifier, context);
+  try {
+    return await nextResolve(specifier, context);
+  } catch (error) {
+    // Packages without an "exports" map, such as next ("next/link"), rely on CommonJS-style
+    // extension lookup, which Node's ESM resolver does not do.
+    const bareSubpath = /^[^./][^:]*\/[^/]+$/.test(specifier) && !specifier.endsWith(".js");
+    if (error?.code !== "ERR_MODULE_NOT_FOUND" || !bareSubpath) throw error;
+    return nextResolve(`${specifier}.js`, context);
+  }
 }
 
 export async function load(url, context, nextLoad) {
