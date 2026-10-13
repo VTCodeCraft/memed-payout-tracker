@@ -1,14 +1,14 @@
 import express from 'express';
 import request from 'supertest';
 import { z } from 'zod';
-import { createApp } from '../../src/app';
+import { createTestApp } from '../helpers/app';
 import { AppError } from '../../src/lib/app-error';
 import { errorHandler } from '../../src/middleware/errors';
 
 const ALLOWED = 'https://memed-payout-tracker-livid.vercel.app';
 
 describe('error responses', () => {
-  const app = createApp({ corsOrigins: [ALLOWED] });
+  const app = createTestApp({ corsOrigins: [ALLOWED] });
 
   it('returns a JSON 404 for an unknown path, readable cross-origin', async () => {
     const res = await request(app).get('/api/nope').set('Origin', ALLOWED);

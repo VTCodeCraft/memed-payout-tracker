@@ -13,7 +13,7 @@ async function main(): Promise<void> {
   await connectToDatabase(env.mongodbUri);
   console.log(`Connected to MongoDB database "${mongoose.connection.name}"`);
 
-  createApp({ corsOrigins: env.corsOrigins }).listen(env.port, () => {
+  createApp({ corsOrigins: env.corsOrigins, jwt: env.jwt }).listen(env.port, () => {
     console.log(`API listening on http://localhost:${env.port} (${env.nodeEnv})`);
     console.log(`CORS allowed origins: ${env.corsOrigins.join(', ')}`);
   });

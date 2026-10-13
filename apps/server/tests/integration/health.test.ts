@@ -1,11 +1,11 @@
 import mongoose from 'mongoose';
 import request from 'supertest';
-import { createApp } from '../../src/app';
+import { createTestApp } from '../helpers/app';
 import { connectToDatabase } from '../../src/db/connection';
 import { startTestDatabase, type TestDatabase } from '../helpers/database';
 
 describe('GET /api/health', () => {
-  const app = createApp({ corsOrigins: [] });
+  const app = createTestApp();
   let db: TestDatabase;
 
   beforeAll(async () => {

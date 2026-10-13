@@ -1,11 +1,11 @@
 import request from 'supertest';
-import { createApp } from '../../src/app';
+import { createTestApp } from '../helpers/app';
 
 const ALLOWED = 'https://memed-payout-tracker-livid.vercel.app';
 const BLOCKED = 'https://evil.example.com';
 
 describe('CORS policy', () => {
-  const app = createApp({ corsOrigins: [ALLOWED, 'http://localhost:3001'] });
+  const app = createTestApp({ corsOrigins: [ALLOWED, 'http://localhost:3001'] });
 
   it('echoes an allowed origin so the browser can read the response', async () => {
     const res = await request(app).get('/api/health').set('Origin', ALLOWED);
