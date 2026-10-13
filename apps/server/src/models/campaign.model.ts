@@ -2,6 +2,7 @@ import { type HydratedDocument, type InferSchemaType, Schema, model } from 'mong
 import { atLeast } from './validators';
 
 export const PLATFORMS = ['instagram', 'youtube'] as const;
+export type Platform = (typeof PLATFORMS)[number];
 export const CAMPAIGN_STATUSES = ['live', 'exhausted'] as const;
 export const MAX_MILESTONES = 10;
 /** Largest amount an Int32 money field can hold (about 214 crore rupees). */
@@ -81,7 +82,7 @@ export const Campaign = model('Campaign', campaignSchema);
 export interface CampaignResponse {
   id: string;
   name: string;
-  platform: (typeof PLATFORMS)[number];
+  platform: Platform;
   totalBudget: number;
   spent: number;
   remaining: number;
