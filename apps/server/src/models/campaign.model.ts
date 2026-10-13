@@ -1,4 +1,5 @@
 import { type HydratedDocument, type InferSchemaType, Schema, model } from 'mongoose';
+import { atLeast } from './validators';
 
 export const PLATFORMS = ['instagram', 'youtube'] as const;
 export const CAMPAIGN_STATUSES = ['live', 'exhausted'] as const;
@@ -34,12 +35,6 @@ export function milestoneLadderProblem(milestones: readonly Milestone[], totalBu
   }
   return undefined;
 }
-
-// Int32 schema types silently ignore Mongoose's `min` option, so lower bounds are explicit.
-const atLeast = (minimum: number) => ({
-  validator: (value: number) => value >= minimum,
-  message: `must be at least ${minimum}`,
-});
 
 const milestoneSchema = new Schema(
   {
