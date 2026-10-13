@@ -1,7 +1,17 @@
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, it, mock } from "node:test";
 import { ApiError } from "./api-client.ts";
-import { SIGNUP_FIELDS, type SignupForm, authFailure, checkSignup, homePath, signUp } from "./auth.ts";
+import {
+  LOGIN_FIELDS,
+  SIGNUP_FIELDS,
+  type SignupForm,
+  authFailure,
+  checkLogin,
+  checkSignup,
+  homePath,
+  logIn,
+  signUp,
+} from "./auth.ts";
 import { SessionStorageError, getSession } from "./session.ts";
 
 class MemoryStorage implements Storage {
@@ -163,5 +173,56 @@ describe("authFailure", () => {
 
   it("explains blocked storage", () => {
     assert.match(authFailure(new SessionStorageError(), SIGNUP_FIELDS).message ?? "", /blocking site storage/);
+  });
+});
+
+describe("checkLogin", () => {
+  it("only checks that both fields are present and the email is shaped like one", () => {
+    assert.deepEqual(checkLogin({ email: "", password: "" }), {
+      problems: { email: "is required", password: "is required" },
+    });
+    assert.deepEqual(checkLogin({ email: "not-an-email", password: "x" }), {
+      problems: { email: "must be a valid email address" },
+    });
+    // A short password is still sent: login does not reveal signup's password rules.
+    assert.deepEqual(checkLogin({ email: "clips@example.test", password: "x" }), {
+      input: { email: "clips@example.test", password: "x" },
+    });
+  });
+});
+
+describe("logIn", () => {
+  it("posts the credentials and stores the returned session", async () => {
+    const calls = stubFetch(() => json(200, { token: "token-2", user: creator }));
+
+    const session = await logIn({ email: "clips@example.test", password: "long enough" });
+
+    assert.match(calls[0].url, /\/api\/auth\/login$/);
+    assert.equal(calls[0].init?.method, "POST");
+    assert.deepEqual(JSON.parse(String(calls[0].init?.body)), { email: "clips@example.test", password: "long enough" });
+    assert.equal(session.user.role, "creator");
+    assert.deepEqual(getSession(), session);
+  });
+
+  it("stores nothing and shows one generic message for wrong credentials", async () => {
+    stubFetch(() => json(401, { error: { code: "INVALID_CREDENTIALS", message: "Invalid email or password" } }));
+
+    const failure = await logIn({ email: "nobody@example.test", password: "wrong" }).catch((error: unknown) => error);
+
+    assert.equal(getSession(), null);
+    const feedback = authFailure(failure, LOGIN_FIELDS);
+    assert.deepEqual(feedback.fields, {});
+    assert.match(feedback.message ?? "", /don't match an account/);
+  });
+
+  it("maps the API's validation details onto the login fields", () => {
+    const error = apiError(400, "VALIDATION_ERROR", "Request validation failed", [
+      { path: "email", message: "must be a valid email address" },
+    ]);
+
+    assert.deepEqual(authFailure(error, LOGIN_FIELDS), {
+      fields: { email: "must be a valid email address" },
+      message: undefined,
+    });
   });
 });

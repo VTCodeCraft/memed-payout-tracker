@@ -66,6 +66,29 @@ export function checkSignup(form: SignupForm): { input: SignupInput } | { proble
   return { input: { name: form.name, email: form.email, password: form.password, role: form.role } };
 }
 
+export interface LoginForm {
+  email: string;
+  password: string;
+}
+
+export const LOGIN_FIELDS = ["email", "password"] as const;
+
+// Presence only, like the API's login schema: password rules belong to signup, and
+// checking them here would tell a guesser what the rules are.
+export function checkLogin(form: LoginForm): { input: LoginForm } | { problems: FieldProblems } {
+  const problems: FieldProblems = {};
+  const email = emailProblem(form.email);
+  if (email) problems.email = email;
+  if (form.password === "") problems.password = "is required";
+  return Object.keys(problems).length > 0 ? { problems } : { input: form };
+}
+
+/** Signs in and stores the returned session. Rejects with ApiError or SessionStorageError. */
+export async function logIn(input: LoginForm): Promise<Session> {
+  const { token, user } = await apiRequest<AuthResponse>("auth/login", { method: "POST", body: input });
+  return saveSession(token, user);
+}
+
 /** Creates the account and stores the returned session. Rejects with ApiError or SessionStorageError. */
 export async function signUp(input: SignupInput): Promise<Session> {
   const { token, user } = await apiRequest<AuthResponse>("auth/signup", { method: "POST", body: input });
@@ -94,6 +117,9 @@ export function authFailure(error: unknown, formFields: readonly string[]): Form
       const unmatched = all.length > Object.keys(fields).length || all.length === 0;
       return { fields, message: unmatched ? "Some details were not accepted. Check the form and try again." : undefined };
     }
+    case "INVALID_CREDENTIALS":
+      // The API uses one answer for an unknown email and a wrong password; so does this.
+      return { fields: {}, message: "That email and password don't match an account. Check both and try again." };
     case "EMAIL_TAKEN":
       return { fields: { email: "an account with this email already exists" } };
     case "RATE_LIMITED":
