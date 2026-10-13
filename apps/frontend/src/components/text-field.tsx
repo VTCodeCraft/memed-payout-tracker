@@ -40,7 +40,7 @@ export function TextField({ label, hint, error, className = "", ...inputProps }:
         {...inputProps}
       />
       {error && (
-        <p id={errorId} className="text-sm font-medium text-danger-ink">
+        <p id={errorId} className="text-sm font-medium text-danger-ink first-letter:uppercase">
           {error}
         </p>
       )}

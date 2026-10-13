@@ -9,7 +9,8 @@ const bricolage = Bricolage_Grotesque({
 });
 
 export const metadata: Metadata = {
-  title: "Meme'd Payout Tracker",
+  // Pages set their own title; every tab still names the app ("Log in · Meme'd Payout Tracker").
+  title: { default: "Meme'd Payout Tracker", template: "%s · Meme'd Payout Tracker" },
   description: "Milestone-based campaign payouts for brands and creators.",
 };
 
