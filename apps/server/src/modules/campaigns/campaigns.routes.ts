@@ -1,9 +1,10 @@
 import { Router } from 'express';
 import { AppError } from '../../lib/app-error';
+import { idParamsSchema } from '../../lib/validation';
 import { getAuthUser, requireAuth, requireRole } from '../../middleware/auth';
 import { Campaign, toCampaignResponse } from '../../models/campaign.model';
 import { Submission, toSubmissionResponse } from '../../models/submission.model';
-import { campaignParamsSchema, createCampaignSchema } from './campaigns.schemas';
+import { createCampaignSchema } from './campaigns.schemas';
 
 export function createCampaignsRouter(jwtSecret: string): Router {
   const router = Router();
@@ -30,7 +31,7 @@ export function createCampaignsRouter(jwtSecret: string): Router {
   // Creators may open any campaign to read its ladder; brands only their own.
   // Another brand's campaign answers 404 so its existence is not revealed.
   router.get('/:id', async (req, res) => {
-    const { id } = campaignParamsSchema.parse(req.params);
+    const { id } = idParamsSchema.parse(req.params);
     const user = getAuthUser(req);
     const campaign = await Campaign.findById(id);
 
@@ -43,7 +44,7 @@ export function createCampaignsRouter(jwtSecret: string): Router {
   // One query checks existence and ownership together, so another brand's campaign
   // and a missing one both answer 404.
   router.get('/:id/submissions', requireRole('brand'), async (req, res) => {
-    const { id } = campaignParamsSchema.parse(req.params);
+    const { id } = idParamsSchema.parse(req.params);
     const campaign = await Campaign.findOne({ _id: id, brandId: getAuthUser(req).id });
     if (!campaign) {
       throw new AppError(404, 'NOT_FOUND', 'Campaign not found');

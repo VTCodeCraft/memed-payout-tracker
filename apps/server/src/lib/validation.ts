@@ -11,3 +11,6 @@ export const requiredNumber = () =>
 
 /** A 24-character hex MongoDB ObjectId, checked before it can reach a query. */
 export const objectId = () => requiredString().regex(/^[a-f\d]{24}$/i, 'must be a valid id');
+
+/** Route parameters of the form /:id. */
+export const idParamsSchema = z.object({ id: objectId() });

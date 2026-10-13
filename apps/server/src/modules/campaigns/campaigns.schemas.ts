@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { objectId, requiredNumber, requiredString } from '../../lib/validation';
+import { requiredNumber, requiredString } from '../../lib/validation';
 import { MAX_RUPEES, PLATFORMS, milestoneLadderProblem } from '../../models/campaign.model';
 
 const rupees = requiredNumber()
@@ -22,5 +22,3 @@ export const createCampaignSchema = z
     const problem = milestoneLadderProblem(milestones, totalBudget);
     if (problem) ctx.addIssue({ code: 'custom', path: ['milestones'], message: problem });
   });
-
-export const campaignParamsSchema = z.object({ id: objectId() });
