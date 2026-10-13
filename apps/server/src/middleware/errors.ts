@@ -1,8 +1,15 @@
 import type { ErrorRequestHandler, RequestHandler } from 'express';
+import { ZodError } from 'zod';
+import { AppError } from '../lib/app-error';
 
 /** Shape of every error response the API sends. */
 export interface ErrorResponseBody {
-  error: { code: string; message: string };
+  error: {
+    code: string;
+    message: string;
+    /** Per-field problems for VALIDATION_ERROR, e.g. { path: 'email', message: '...' }. */
+    details?: { path: string; message: string }[];
+  };
 }
 
 interface ClientHttpError {
@@ -22,6 +29,24 @@ export const notFoundHandler: RequestHandler = (req, res) => {
 export const errorHandler: ErrorRequestHandler = (err, _req, res, next) => {
   if (res.headersSent) {
     next(err);
+    return;
+  }
+
+  if (err instanceof AppError) {
+    const body: ErrorResponseBody = { error: { code: err.code, message: err.message } };
+    res.status(err.status).json(body);
+    return;
+  }
+
+  if (err instanceof ZodError) {
+    const body: ErrorResponseBody = {
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'Request validation failed',
+        details: err.issues.map((issue) => ({ path: issue.path.join('.'), message: issue.message })),
+      },
+    };
+    res.status(400).json(body);
     return;
   }
 

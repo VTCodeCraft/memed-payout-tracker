@@ -1,6 +1,8 @@
 import express from 'express';
 import request from 'supertest';
+import { z } from 'zod';
 import { createApp } from '../../src/app';
+import { AppError } from '../../src/lib/app-error';
 import { errorHandler } from '../../src/middleware/errors';
 
 const ALLOWED = 'https://memed-payout-tracker-livid.vercel.app';
@@ -83,5 +85,47 @@ describe('error responses', () => {
     expect(res.body.error.code).toBe('INTERNAL_ERROR');
     expect(consoleError).toHaveBeenCalledWith(expect.objectContaining({ message: 'async failure' }));
     consoleError.mockRestore();
+  });
+
+  it('turns an AppError into its status and code without logging it as a failure', async () => {
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const conflicting = express()
+      .post('/thing', () => {
+        throw new AppError(409, 'EMAIL_TAKEN', 'An account with this email already exists');
+      })
+      .use(errorHandler);
+
+    const res = await request(conflicting).post('/thing');
+
+    expect(res.status).toBe(409);
+    expect(res.body).toEqual({
+      error: { code: 'EMAIL_TAKEN', message: 'An account with this email already exists' },
+    });
+    expect(consoleError).not.toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+
+  it('turns a zod validation failure into 400 VALIDATION_ERROR with per-field details', async () => {
+    const schema = z.object({ email: z.email('must be a valid email address'), age: z.number() });
+    const validating = express()
+      .use(express.json())
+      .post('/thing', (req) => {
+        schema.parse(req.body);
+      })
+      .use(errorHandler);
+
+    const res = await request(validating).post('/thing').send({ email: 'nope' });
+
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'Request validation failed',
+        details: [
+          { path: 'email', message: 'must be a valid email address' },
+          { path: 'age', message: 'Invalid input: expected number, received undefined' },
+        ],
+      },
+    });
   });
 });
