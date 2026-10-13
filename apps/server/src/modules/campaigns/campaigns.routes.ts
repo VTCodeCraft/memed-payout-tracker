@@ -19,5 +19,11 @@ export function createCampaignsRouter(jwtSecret: string): Router {
     res.status(200).json({ campaigns: campaigns.map(toCampaignResponse) });
   });
 
+  // The brief lists "list live campaigns" as a creator feature.
+  router.get('/live', requireRole('creator'), async (_req, res) => {
+    const campaigns = await Campaign.find({ status: 'live' }).sort({ createdAt: -1, _id: -1 });
+    res.status(200).json({ campaigns: campaigns.map(toCampaignResponse) });
+  });
+
   return router;
 }

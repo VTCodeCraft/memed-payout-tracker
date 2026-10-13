@@ -26,6 +26,12 @@ async function account(role: Role, email: string) {
   return { id: user.id, auth: `Bearer ${signAccessToken({ id: user.id, role }, TEST_JWT)}` };
 }
 
+/** Creates a campaign through the API as the given brand and returns the response body. */
+async function createAs(auth: string, name: string) {
+  return (await request(app).post('/api/campaigns').set('Authorization', auth).send({ ...diwaliDrop, name })).body
+    .campaign;
+}
+
 describe('campaign endpoints', () => {
   let db: TestDatabase;
 
@@ -145,9 +151,6 @@ describe('campaign endpoints', () => {
   });
 
   describe('GET /api/campaigns/mine', () => {
-    const createAs = async (auth: string, name: string) =>
-      (await request(app).post('/api/campaigns').set('Authorization', auth).send({ ...diwaliDrop, name })).body
-        .campaign;
     const mine = (auth?: string, query = '') => {
       const req = request(app).get(`/api/campaigns/mine${query}`);
       return auth === undefined ? req : req.set('Authorization', auth);
@@ -195,6 +198,50 @@ describe('campaign endpoints', () => {
       const res = await mine(creator.auth);
       expect(res.status).toBe(403);
       expect(res.body.error.code).toBe('FORBIDDEN');
+    });
+  });
+
+  describe('GET /api/campaigns/live', () => {
+    const live = (auth?: string) => {
+      const req = request(app).get('/api/campaigns/live');
+      return auth === undefined ? req : req.set('Authorization', auth);
+    };
+
+    it('shows creators every live campaign across brands, newest first, and hides exhausted ones', async () => {
+      const acme = await account('brand', 'brand@acme.test');
+      const globex = await account('brand', 'brand@globex.test');
+      const creator = await account('creator', 'creator@memes.test');
+      const acmeLive = await createAs(acme.auth, 'Acme live');
+      const exhausted = await createAs(globex.auth, 'Globex exhausted');
+      const globexLive = await createAs(globex.auth, 'Globex live');
+      await Campaign.updateOne({ _id: exhausted.id }, { $set: { spent: 6_000, status: 'exhausted' } });
+
+      const res = await live(creator.auth);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ campaigns: [globexLive, acmeLive] });
+    });
+
+    it('reveals nothing about the brand accounts', async () => {
+      const acme = await account('brand', 'brand@acme.test');
+      const creator = await account('creator', 'creator@memes.test');
+      await createAs(acme.auth, 'Acme live');
+
+      const res = await live(creator.auth);
+
+      expect(res.body.campaigns).toHaveLength(1);
+      expect(res.text).not.toContain(acme.id);
+      expect(res.text).not.toContain('brand@acme.test');
+      expect(res.body.campaigns[0]).not.toHaveProperty('brandId');
+    });
+
+    it('returns 401 without a token and 403 for a brand', async () => {
+      const brand = await account('brand', 'brand@acme.test');
+
+      expect((await live()).status).toBe(401);
+      const res = await live(brand.auth);
+      expect(res.status).toBe(403);
+      expect(res.body.error).toEqual({ code: 'FORBIDDEN', message: 'This action requires a creator account' });
     });
   });
 });
