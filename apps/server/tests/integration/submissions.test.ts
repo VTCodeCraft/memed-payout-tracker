@@ -220,4 +220,47 @@ describe('submission endpoints', () => {
       expect(await Submission.countDocuments()).toBe(1);
     });
   });
+
+  describe('GET /api/submissions/mine', () => {
+    const mine = (auth?: string, query = '') => {
+      const req = request(app).get(`/api/submissions/mine${query}`);
+      return auth === undefined ? req : req.set('Authorization', auth);
+    };
+
+    it("returns only the authenticated creator's submissions, newest first", async () => {
+      const brand = await account('brand', 'brand@acme.test');
+      const creator = await account('creator', 'creator@memes.test');
+      const otherCreator = await account('creator', 'other@memes.test');
+      const campaignId = await campaign(brand.id);
+      const first = (await submit(creator.auth, { campaignId, postUrl: 'https://www.instagram.com/p/FirstPost1/' })).body;
+      await submit(otherCreator.auth, { campaignId, postUrl: 'https://www.instagram.com/p/OtherPost1/' });
+      const second = (await submit(creator.auth, { campaignId, postUrl: 'https://www.instagram.com/p/SecondPost/' })).body;
+
+      const res = await mine(creator.auth);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ submissions: [second.submission, first.submission] });
+    });
+
+    it('cannot be pointed at another creator through query parameters', async () => {
+      const brand = await account('brand', 'brand@acme.test');
+      const creator = await account('creator', 'creator@memes.test');
+      const otherCreator = await account('creator', 'other@memes.test');
+      await submit(otherCreator.auth, { campaignId: await campaign(brand.id), postUrl: REEL });
+
+      const res = await mine(creator.auth, `?creatorId=${otherCreator.id}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ submissions: [] });
+    });
+
+    it('returns 401 without a token and 403 for a brand', async () => {
+      const brand = await account('brand', 'brand@acme.test');
+
+      expect((await mine()).status).toBe(401);
+      const res = await mine(brand.auth);
+      expect(res.status).toBe(403);
+      expect(res.body.error.code).toBe('FORBIDDEN');
+    });
+  });
 });

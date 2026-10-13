@@ -46,5 +46,11 @@ export function createSubmissionsRouter(jwtSecret: string): Router {
     res.status(201).json({ submission: toSubmissionResponse(submission) });
   });
 
+  // Filtered by the token's user id only; query parameters are never read.
+  router.get('/mine', ...creatorOnly, async (req, res) => {
+    const submissions = await Submission.find({ creatorId: getAuthUser(req).id }).sort({ createdAt: -1, _id: -1 });
+    res.status(200).json({ submissions: submissions.map(toSubmissionResponse) });
+  });
+
   return router;
 }
