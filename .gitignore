@@ -15,6 +15,9 @@ next-env.d.ts
 
 # testing
 coverage/
+# Playwright: traces and reports from failed browser tests
+test-results/
+playwright-report/
 
 # environment files (only examples are committed)
 .env
