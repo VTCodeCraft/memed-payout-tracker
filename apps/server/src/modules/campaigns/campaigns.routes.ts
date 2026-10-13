@@ -13,5 +13,11 @@ export function createCampaignsRouter(jwtSecret: string): Router {
     res.status(201).json({ campaign: toCampaignResponse(campaign) });
   });
 
+  // Ownership comes only from the token; query parameters are never read.
+  router.get('/mine', requireRole('brand'), async (req, res) => {
+    const campaigns = await Campaign.find({ brandId: getAuthUser(req).id }).sort({ createdAt: -1, _id: -1 });
+    res.status(200).json({ campaigns: campaigns.map(toCampaignResponse) });
+  });
+
   return router;
 }

@@ -143,4 +143,58 @@ describe('campaign endpoints', () => {
       ]);
     });
   });
+
+  describe('GET /api/campaigns/mine', () => {
+    const createAs = async (auth: string, name: string) =>
+      (await request(app).post('/api/campaigns').set('Authorization', auth).send({ ...diwaliDrop, name })).body
+        .campaign;
+    const mine = (auth?: string, query = '') => {
+      const req = request(app).get(`/api/campaigns/mine${query}`);
+      return auth === undefined ? req : req.set('Authorization', auth);
+    };
+
+    it("returns only the authenticated brand's campaigns, newest first", async () => {
+      const acme = await account('brand', 'brand@acme.test');
+      const globex = await account('brand', 'brand@globex.test');
+      const first = await createAs(acme.auth, 'Acme first');
+      await createAs(globex.auth, 'Globex only');
+      const second = await createAs(acme.auth, 'Acme second');
+
+      const res = await mine(acme.auth);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ campaigns: [second, first] });
+      expect((await mine(globex.auth)).body.campaigns.map((c: { name: string }) => c.name)).toEqual(['Globex only']);
+    });
+
+    it('cannot be pointed at another brand through query parameters', async () => {
+      const acme = await account('brand', 'brand@acme.test');
+      const globex = await account('brand', 'brand@globex.test');
+      await createAs(globex.auth, 'Globex secret plan');
+
+      const res = await mine(acme.auth, `?brandId=${globex.id}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ campaigns: [] });
+    });
+
+    it('reports spent and remaining budget for each campaign', async () => {
+      const acme = await account('brand', 'brand@acme.test');
+      const { id } = await createAs(acme.auth, 'Partly spent');
+      await Campaign.updateOne({ _id: id }, { $set: { spent: 2_500 } });
+
+      const [campaign] = (await mine(acme.auth)).body.campaigns;
+
+      expect(campaign).toMatchObject({ totalBudget: 6_000, spent: 2_500, remaining: 3_500 });
+    });
+
+    it('returns 401 without a token and 403 for a creator', async () => {
+      const creator = await account('creator', 'creator@memes.test');
+
+      expect((await mine()).status).toBe(401);
+      const res = await mine(creator.auth);
+      expect(res.status).toBe(403);
+      expect(res.body.error.code).toBe('FORBIDDEN');
+    });
+  });
 });
