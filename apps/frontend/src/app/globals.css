@@ -1,18 +1,41 @@
 @import "tailwindcss";
 
-/* Light theme base: ink #131313 on white, as used on memed.in. */
-:root {
-  --background: #ffffff;
-  --foreground: #131313;
+/*
+ * Design tokens. [M] = observed in memed.in's :root variables, [W] = observed on
+ * wldd.in, [D] = derived here. Contrast ratios are WCAG, against white unless noted.
+ * Tailwind's default palette is removed so only these colours can be used.
+ */
+@theme {
+  --color-*: initial;
+  --color-white: #ffffff;
+  --color-ink: #131313; /* [M] --primary-text and --border: text, borders, dark fills (18.6:1) */
+  --color-muted: #717171; /* [D] ink at 60% on white, as Meme'd fades secondary text (4.9:1) */
+  --color-brand: #612aff; /* [M] --memed-theme: primary action, links, focus (6.4:1 either way) */
+  --color-lime: #fff136; /* [M] --memed-lime: highlight fill, ink text only (15.8:1 ink on lime) */
+  --color-green: #96ff43; /* [M] --memed-green: live and paid fills, ink text only (14.8:1) */
+  --color-danger: #ff3427; /* [W] hero red: error borders only, too light for text (3.6:1) */
+  --color-danger-ink: #c42c22; /* [D] danger mixed 75/25 with ink, for error text (5.6:1) */
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  /* Bricolage Grotesque [W] via next/font; Meme'd's Gilroy is a licensed font we cannot ship. */
   --font-sans: var(--font-bricolage), ui-sans-serif, system-ui, Arial, sans-serif;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
+@layer base {
+  :root {
+    /* The design is light-only; keep native controls and scrollbars light too. */
+    color-scheme: light;
+  }
+
+  body {
+    background: var(--color-white);
+    color: var(--color-ink);
+  }
+
+  /* One visible focus style for every interactive element, shown for keyboard use only. */
+  :focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+  }
 }
