@@ -263,4 +263,72 @@ describe('submission endpoints', () => {
       expect(res.body.error.code).toBe('FORBIDDEN');
     });
   });
+
+  describe('GET /api/campaigns/:id/submissions', () => {
+    const forCampaign = (id: string, auth?: string) => {
+      const req = request(app).get(`/api/campaigns/${id}/submissions`);
+      return auth === undefined ? req : req.set('Authorization', auth);
+    };
+
+    it("returns a brand's own campaign submissions from every creator, newest first", async () => {
+      const brand = await account('brand', 'brand@acme.test');
+      const creator = await account('creator', 'creator@memes.test');
+      const otherCreator = await account('creator', 'other@memes.test');
+      const campaignId = await campaign(brand.id);
+      const otherCampaignId = await campaign(brand.id, { name: 'Holi Hype' });
+      const first = (await submit(creator.auth, { campaignId, postUrl: 'https://www.instagram.com/p/FirstPost1/' })).body;
+      const second = (await submit(otherCreator.auth, { campaignId, postUrl: 'https://www.instagram.com/p/SecondPost/' }))
+        .body;
+      await submit(creator.auth, { campaignId: otherCampaignId, postUrl: 'https://www.instagram.com/p/ElsewhereX/' });
+
+      const res = await forCampaign(campaignId, brand.auth);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ submissions: [second.submission, first.submission] });
+    });
+
+    it('returns an empty list for a campaign without submissions', async () => {
+      const brand = await account('brand', 'brand@acme.test');
+
+      const res = await forCampaign(await campaign(brand.id), brand.auth);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ submissions: [] });
+    });
+
+    it("answers 404 for another brand's campaign, exactly like a missing one", async () => {
+      const acme = await account('brand', 'brand@acme.test');
+      const globex = await account('brand', 'brand@globex.test');
+      const creator = await account('creator', 'creator@memes.test');
+      const campaignId = await campaign(acme.id);
+      await submit(creator.auth, { campaignId, postUrl: REEL });
+
+      const otherBrand = await forCampaign(campaignId, globex.auth);
+      const missing = await forCampaign(new mongoose.Types.ObjectId().toString(), globex.auth);
+
+      expect(otherBrand.status).toBe(404);
+      expect(otherBrand.body).toEqual({ error: { code: 'NOT_FOUND', message: 'Campaign not found' } });
+      expect(missing.body).toEqual(otherBrand.body);
+    });
+
+    it('rejects a malformed campaign id with 400', async () => {
+      const brand = await account('brand', 'brand@acme.test');
+
+      const res = await forCampaign('not-an-id', brand.auth);
+
+      expect(res.status).toBe(400);
+      expect(res.body.error.details).toEqual([{ path: 'id', message: 'must be a valid id' }]);
+    });
+
+    it('returns 401 without a token and 403 for a creator', async () => {
+      const brand = await account('brand', 'brand@acme.test');
+      const creator = await account('creator', 'creator@memes.test');
+      const campaignId = await campaign(brand.id);
+
+      expect((await forCampaign(campaignId)).status).toBe(401);
+      const res = await forCampaign(campaignId, creator.auth);
+      expect(res.status).toBe(403);
+      expect(res.body.error.code).toBe('FORBIDDEN');
+    });
+  });
 });
