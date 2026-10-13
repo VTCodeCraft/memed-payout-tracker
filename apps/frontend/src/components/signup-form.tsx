@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Alert } from "@/components/alert";
 import { AuthSubmit } from "@/components/auth-submit";
+import { PasswordField } from "@/components/password-field";
 import { RadioCards } from "@/components/radio-cards";
 import { TextField } from "@/components/text-field";
 import { SIGNUP_FIELDS, type SignupForm as SignupValues, authFailure, checkSignup, signUp } from "@/lib/auth";
@@ -48,11 +49,10 @@ export function SignupForm() {
         onChange={(event) => update("email", event.target.value)}
         error={feedback.fields.email}
       />
-      <TextField
+      <PasswordField
         label="Password"
         hint="At least 8 characters."
         name="password"
-        type="password"
         autoComplete="new-password"
         value={values.password}
         onChange={(event) => update("password", event.target.value)}

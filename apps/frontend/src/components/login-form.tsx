@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Alert } from "@/components/alert";
 import { AuthSubmit } from "@/components/auth-submit";
+import { PasswordField } from "@/components/password-field";
 import { TextField } from "@/components/text-field";
 import { LOGIN_FIELDS, type LoginForm as LoginValues, authFailure, checkLogin, logIn } from "@/lib/auth";
 import { useFormSubmit } from "@/lib/use-form-submit";
@@ -33,10 +34,9 @@ export function LoginForm() {
         onChange={(event) => update("email", event.target.value)}
         error={feedback.fields.email}
       />
-      <TextField
+      <PasswordField
         label="Password"
         name="password"
-        type="password"
         autoComplete="current-password"
         value={values.password}
         onChange={(event) => update("password", event.target.value)}

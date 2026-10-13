@@ -15,7 +15,7 @@ export async function signUpInBrowser(page: Page, { name, email, role }: { name:
   await page.goto("/signup");
   await page.getByLabel("Name", { exact: true }).fill(name);
   await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill(PASSWORD);
+  await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
   await page.getByRole("radio", { name: role === "brand" ? /^Brand/ : /^Creator/ }).check();
   await page.getByRole("button", { name: "Create account" }).click();
   await expect(page.getByRole("button", { name: "Log out" })).toBeVisible();
@@ -24,7 +24,7 @@ export async function signUpInBrowser(page: Page, { name, email, role }: { name:
 export async function logInInBrowser(page: Page, email: string) {
   await page.goto("/login");
   await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill(PASSWORD);
+  await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
   await page.getByRole("button", { name: "Log in" }).click();
   await expect(page.getByRole("button", { name: "Log out" })).toBeVisible();
 }

@@ -1,11 +1,13 @@
-import { useId, type ComponentProps } from "react";
+import { useId, type ComponentProps, type ReactNode } from "react";
 
-interface TextFieldProps extends Omit<ComponentProps<"input">, "id"> {
+export interface TextFieldProps extends Omit<ComponentProps<"input">, "id"> {
   label: string;
   /** Guidance shown above the input, such as a password rule. */
   hint?: string;
   /** Validation message; marks the input invalid and is read out with it. */
   error?: string;
+  /** A control inside the input's right edge, such as a show-password button. */
+  action?: ReactNode;
 }
 
 /**
@@ -13,7 +15,7 @@ interface TextFieldProps extends Omit<ComponentProps<"input">, "id"> {
  * input through aria-describedby, so screen readers announce them on focus.
  * `className` styles the wrapper, for layout only.
  */
-export function TextField({ label, hint, error, className = "", ...inputProps }: TextFieldProps) {
+export function TextField({ label, hint, error, action, className = "", ...inputProps }: TextFieldProps) {
   const id = useId();
   const hintId = `${id}-hint`;
   const errorId = `${id}-error`;
@@ -29,16 +31,19 @@ export function TextField({ label, hint, error, className = "", ...inputProps }:
           {hint}
         </p>
       )}
-      {/* text-base (16px) stops iOS Safari zooming into the field on focus. */}
-      <input
-        id={id}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={describedBy}
-        className={`min-h-12 rounded-xl border bg-white px-4 text-base placeholder:text-muted ${
-          error ? "border-danger ring-1 ring-danger" : "border-ink"
-        }`}
-        {...inputProps}
-      />
+      <div className="relative">
+        {/* text-base (16px) stops iOS Safari zooming into the field on focus. */}
+        <input
+          id={id}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={describedBy}
+          className={`min-h-12 w-full rounded-xl border bg-white px-4 text-base placeholder:text-muted ${action ? "pr-14" : ""} ${
+            error ? "border-danger ring-1 ring-danger" : "border-ink"
+          }`}
+          {...inputProps}
+        />
+        {action}
+      </div>
       {error && (
         <p id={errorId} className="text-sm font-medium text-danger-ink first-letter:uppercase">
           {error}
