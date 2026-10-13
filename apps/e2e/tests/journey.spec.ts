@@ -88,6 +88,14 @@ test("a brand's campaign pays a creator's posts up to its budget, and both see t
     await expect(figure(page, "Unfunded")).toHaveText("₹1,500");
     await expect(figure(page, "Posts")).toHaveText("2");
     await expect(page.getByRole("region", { name: "Your posts" }).getByRole("link", { name: "Diwali clips" })).toHaveCount(2);
+
+    // The table scrolls sideways inside its own box on a phone. Anything absolutely positioned
+    // in it, like the "(opens in a new tab)" labels, must be positioned within that box too, or
+    // it escapes the scrolling and, with a long enough link, widens the whole page.
+    const escaped = await page.getByRole("table").locator("..").evaluate((box) =>
+      [...box.querySelectorAll("*")].filter((el) => getComputedStyle(el).position === "absolute" && !box.contains((el as HTMLElement).offsetParent)).length,
+    );
+    expect(escaped).toBe(0);
     await logOut(page);
   });
 

@@ -20,8 +20,10 @@ interface SubmissionsTableProps {
  */
 export function SubmissionsTable({ submissions, campaignOf, campaignHref, labelledBy }: SubmissionsTableProps) {
   return (
-    // Focusable so keyboard users can scroll the table sideways on narrow screens.
-    <div tabIndex={0} role="region" aria-labelledby={labelledBy} className="overflow-x-auto">
+    // Focusable so keyboard users can scroll the table sideways on narrow screens. `relative`
+    // makes this box the containing block of the absolutely positioned sr-only labels, so they
+    // scroll with the table instead of escaping it and widening the page on a phone.
+    <div tabIndex={0} role="region" aria-labelledby={labelledBy} className="relative overflow-x-auto">
       <table className="w-full min-w-xl text-left tabular-nums">
         <thead className="text-sm text-muted">
           <tr>
