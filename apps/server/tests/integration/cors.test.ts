@@ -10,7 +10,6 @@ describe('CORS policy', () => {
   it('echoes an allowed origin so the browser can read the response', async () => {
     const res = await request(app).get('/api/health').set('Origin', ALLOWED);
 
-    expect(res.status).toBe(200);
     expect(res.headers['access-control-allow-origin']).toBe(ALLOWED);
     expect(res.headers['vary']).toMatch(/Origin/);
   });
@@ -54,7 +53,8 @@ describe('CORS policy', () => {
   it('serves requests without an Origin header (health checks, server-to-server)', async () => {
     const res = await request(app).get('/api/health');
 
-    expect(res.status).toBe(200);
+    // Reached the route handler (its status depends on the database, not on CORS).
+    expect(res.body).toHaveProperty('status');
     expect(res.headers['access-control-allow-origin']).toBeUndefined();
   });
 });
