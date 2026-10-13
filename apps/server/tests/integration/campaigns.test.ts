@@ -1,10 +1,10 @@
 import mongoose from 'mongoose';
 import request from 'supertest';
 import { connectToDatabase } from '../../src/db/connection';
-import { signAccessToken } from '../../src/lib/jwt';
 import { Campaign } from '../../src/models/campaign.model';
-import { type Role, User } from '../../src/models/user.model';
-import { TEST_JWT, createTestApp } from '../helpers/app';
+import { User } from '../../src/models/user.model';
+import { account } from '../helpers/accounts';
+import { createTestApp } from '../helpers/app';
 import { startTestDatabase, type TestDatabase } from '../helpers/database';
 
 const app = createTestApp();
@@ -19,12 +19,6 @@ const diwaliDrop = {
     { views: 100_000, payout: 5_000 },
   ],
 };
-
-/** Creates a real user and returns its id plus a matching Bearer header. */
-async function account(role: Role, email: string) {
-  const user = await User.create({ name: `${role} account`, email, role, passwordHash: 'not-used-in-these-tests' });
-  return { id: user.id, auth: `Bearer ${signAccessToken({ id: user.id, role }, TEST_JWT)}` };
-}
 
 /** Creates a campaign through the API as the given brand and returns the response body. */
 async function createAs(auth: string, name: string) {

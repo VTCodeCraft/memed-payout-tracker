@@ -1,5 +1,5 @@
 import { type HydratedDocument, type InferSchemaType, Schema, model } from 'mongoose';
-import { PLATFORMS } from './campaign.model';
+import { PLATFORMS, type Platform } from './campaign.model';
 import { atLeast } from './validators';
 
 const submissionSchema = new Schema(
@@ -38,3 +38,30 @@ submissionSchema.pre('validate', function () {
 export type SubmissionDocument = HydratedDocument<InferSchemaType<typeof submissionSchema>>;
 
 export const Submission = model('Submission', submissionSchema);
+
+/** The submission shape the API sends; owner ids stay server-side. */
+export interface SubmissionResponse {
+  id: string;
+  campaignId: string;
+  platform: Platform;
+  postUrl: string;
+  normalizedUrl: string;
+  views: number;
+  eligiblePayout: number;
+  paidPayout: number;
+  createdAt: string;
+}
+
+export function toSubmissionResponse(submission: SubmissionDocument): SubmissionResponse {
+  return {
+    id: submission.id,
+    campaignId: submission.campaignId.toString(),
+    platform: submission.platform,
+    postUrl: submission.postUrl,
+    normalizedUrl: submission.normalizedUrl,
+    views: submission.views,
+    eligiblePayout: submission.eligiblePayout,
+    paidPayout: submission.paidPayout,
+    createdAt: submission.createdAt.toISOString(),
+  };
+}

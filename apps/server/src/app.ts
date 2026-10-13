@@ -5,6 +5,7 @@ import { errorHandler, notFoundHandler } from './middleware/errors';
 import { createAuthRouter } from './modules/auth/auth.routes';
 import { createCampaignsRouter } from './modules/campaigns/campaigns.routes';
 import { healthRouter } from './modules/health/health.routes';
+import { createSubmissionsRouter } from './modules/submissions/submissions.routes';
 
 export interface AppOptions {
   /** Browser origins allowed to read API responses (exact scheme://host[:port]). */
@@ -28,6 +29,7 @@ export function createApp({ corsOrigins, jwt }: AppOptions): Express {
   app.use('/api', healthRouter);
   app.use('/api/auth', createAuthRouter(jwt));
   app.use('/api/campaigns', createCampaignsRouter(jwt.secret));
+  app.use('/api/submissions', createSubmissionsRouter(jwt.secret));
 
   // Registered last: anything unmatched is a 404, and every error becomes JSON.
   app.use(notFoundHandler);
