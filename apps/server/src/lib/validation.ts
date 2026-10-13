@@ -5,3 +5,6 @@ import { z } from 'zod';
 
 export const requiredString = () =>
   z.string({ error: (issue) => (issue.input === undefined ? 'is required' : 'must be a string') });
+
+export const requiredNumber = () =>
+  z.number({ error: (issue) => (issue.input === undefined ? 'is required' : 'must be a number') });

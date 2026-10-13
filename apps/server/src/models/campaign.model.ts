@@ -3,6 +3,8 @@ import { type HydratedDocument, type InferSchemaType, Schema, model } from 'mong
 export const PLATFORMS = ['instagram', 'youtube'] as const;
 export const CAMPAIGN_STATUSES = ['live', 'exhausted'] as const;
 export const MAX_MILESTONES = 10;
+/** Largest amount an Int32 money field can hold (about 214 crore rupees). */
+export const MAX_RUPEES = 2_147_483_647;
 
 export interface Milestone {
   views: number;
@@ -79,3 +81,31 @@ campaignSchema.pre('validate', function () {
 export type CampaignDocument = HydratedDocument<InferSchemaType<typeof campaignSchema>>;
 
 export const Campaign = model('Campaign', campaignSchema);
+
+/** The campaign shape the API sends: budget spent vs remaining, no owner id. */
+export interface CampaignResponse {
+  id: string;
+  name: string;
+  platform: (typeof PLATFORMS)[number];
+  totalBudget: number;
+  spent: number;
+  remaining: number;
+  milestones: Milestone[];
+  status: (typeof CAMPAIGN_STATUSES)[number];
+  createdAt: string;
+}
+
+export function toCampaignResponse(campaign: CampaignDocument): CampaignResponse {
+  return {
+    id: campaign.id,
+    name: campaign.name,
+    platform: campaign.platform,
+    totalBudget: campaign.totalBudget,
+    spent: campaign.spent,
+    // Derived rather than stored, so it can never disagree with spent.
+    remaining: campaign.totalBudget - campaign.spent,
+    milestones: campaign.milestones.map(({ views, payout }) => ({ views, payout })),
+    status: campaign.status,
+    createdAt: campaign.createdAt.toISOString(),
+  };
+}

@@ -3,6 +3,7 @@ import express, { type Express } from 'express';
 import type { JwtConfig } from './lib/jwt';
 import { errorHandler, notFoundHandler } from './middleware/errors';
 import { createAuthRouter } from './modules/auth/auth.routes';
+import { createCampaignsRouter } from './modules/campaigns/campaigns.routes';
 import { healthRouter } from './modules/health/health.routes';
 
 export interface AppOptions {
@@ -26,6 +27,7 @@ export function createApp({ corsOrigins, jwt }: AppOptions): Express {
 
   app.use('/api', healthRouter);
   app.use('/api/auth', createAuthRouter(jwt));
+  app.use('/api/campaigns', createCampaignsRouter(jwt.secret));
 
   // Registered last: anything unmatched is a 404, and every error becomes JSON.
   app.use(notFoundHandler);
