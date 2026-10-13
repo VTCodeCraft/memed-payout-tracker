@@ -29,8 +29,8 @@ The Express API on Render returns the JWT in a JSON body and expects `Authorizat
 | `/creator` | creator | `GET submissions/earnings`, `GET submissions/mine` | M13 |
 | `/creator/campaigns` | creator | `GET campaigns/live`, `POST submissions` | M13 |
 
-- Signed-in routes live in an `(app)` route group whose layout restores the session, checks the role, and renders the app shell. `(auth)` holds login and signup. Route groups do not change URLs.
-- `GET auth/me` validates a stored token when the app loads.
+- `/brand` and `/creator` each have a layout (`SignedInLayout`) that checks the stored token with `GET auth/me` once per page load, shows nothing protected until it passes, sends other roles to their own home using the API's role, and renders the app shell. The `(auth)` route group holds login and signup and shows them only to signed-out visitors; route groups do not change URLs.
+- Every redirect decision is the pure function `decideAccess()` in `lib/route-guard.ts`, which is unit tested.
 - There is no single-submission endpoint, so submission details come from the list responses. `PATCH submissions/:id/views` returns the updated submission, allocation and campaign remaining.
 
 ## UI states
@@ -43,8 +43,8 @@ Every view that loads data handles each state explicitly:
 | Empty | Says what is missing and links to the action that fills it (for example "Create a campaign"). |
 | Validation error (400 `VALIDATION_ERROR`) | `details[].path` maps onto form fields (`email`, `milestones.0.views`); any message with no matching field shows above the form. |
 | API error | The API's own `message` in an `Alert`, plus a retry where retrying can help. |
-| Unauthorized (401) | Clear the session and go to `/login`. `TOKEN_EXPIRED` says the session expired. |
-| Wrong role (403) | The `(app)` layout redirects to the user's own dashboard before calling the API. |
+| Unauthorized (401) | Clear the session and go to `/login?session=expired`, which says why. |
+| Wrong role (403) | The role layout redirects to the user's own home before any page calls the API. |
 | Network failure or cold start | `NETWORK_ERROR` / `SERVER_UNAVAILABLE` from the client. Render's free tier can take about a minute to wake, so the message says to retry. |
 | Rate limited (429) | Show the API message. Forms stay filled in. |
 
