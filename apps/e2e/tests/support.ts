@@ -5,6 +5,11 @@ export const PASSWORD = "e2e test password";
 
 type Role = "brand" | "creator";
 
+interface Session {
+  token: string;
+  user: { id: string; name: string; role: Role };
+}
+
 /** Signs up through the real form; done once the role's home has verified the session. */
 export async function signUpInBrowser(page: Page, { name, email, role }: { name: string; email: string; role: Role }) {
   await page.goto("/signup");
@@ -27,6 +32,26 @@ export async function logInInBrowser(page: Page, email: string) {
 export async function logOut(page: Page) {
   await page.getByRole("button", { name: "Log out" }).click();
   await expect(page).toHaveURL("/login");
+}
+
+/** Creates an account through the API, for tests about what happens after signing in. */
+export async function createAccount(request: APIRequestContext, role: Role, email: string): Promise<Session> {
+  const response = await request.post(`${API_URL}/api/auth/signup`, {
+    data: { name: `E2E ${role}`, email, password: PASSWORD, role },
+  });
+  expect(response.status()).toBe(201);
+  const { token, user } = await response.json();
+  return { token, user: { id: user.id, name: user.name, role: user.role } };
+}
+
+/**
+ * Puts a session in the browser's storage, as an earlier visit would have left it. It is
+ * written from the favicon, a same-origin page with no app code: written from an app page,
+ * the page could notice the session and redirect while the test is navigating elsewhere.
+ */
+export async function restoreSession(page: Page, session: Session) {
+  await page.goto("/favicon.ico");
+  await page.evaluate((value) => localStorage.setItem("memed.session", JSON.stringify(value)), session);
 }
 
 /** The simulated view feed: PATCH /api/submissions/:id/views takes no authentication. */
