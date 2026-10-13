@@ -1,10 +1,13 @@
+import { existsSync } from 'node:fs';
 import { createApp } from './app';
-import { parseCorsOrigins } from './config/cors';
+import { loadEnv } from './config/env';
 
-const port = Number(process.env.PORT) || 4000;
-const corsOrigins = parseCorsOrigins(process.env.CORS_ORIGINS, process.env.NODE_ENV);
+// Local development reads apps/server/.env; deployed environments provide real variables.
+if (existsSync('.env')) process.loadEnvFile('.env');
 
-createApp({ corsOrigins }).listen(port, () => {
-  console.log(`API listening on http://localhost:${port}`);
-  console.log(`CORS allowed origins: ${corsOrigins.join(', ')}`);
+const env = loadEnv();
+
+createApp({ corsOrigins: env.corsOrigins }).listen(env.port, () => {
+  console.log(`API listening on http://localhost:${env.port} (${env.nodeEnv})`);
+  console.log(`CORS allowed origins: ${env.corsOrigins.join(', ')}`);
 });
