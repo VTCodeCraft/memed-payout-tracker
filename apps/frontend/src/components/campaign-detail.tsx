@@ -79,7 +79,7 @@ export function CampaignDetail({ id }: { id: string }) {
             ) : (
               <SubmissionsTable
                 submissions={submissions.state.data.submissions}
-                campaign={details}
+                campaignOf={() => details}
                 labelledBy="submissions-heading"
               />
             ))}

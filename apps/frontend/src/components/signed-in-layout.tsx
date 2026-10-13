@@ -8,11 +8,19 @@ import { Badge } from "@/components/badge";
 import { Button } from "@/components/button";
 import { NavLink } from "@/components/nav-link";
 import { ApiError } from "@/lib/api-client";
-import { homePath } from "@/lib/auth";
 import { type SessionCheck, decideAccess } from "@/lib/route-guard";
 import { type Role, clearSession, getSession, useStoredSession, verifySession } from "@/lib/session";
 import { SignedInContext } from "@/lib/signed-in";
 import { useSlowRequest } from "@/lib/use-slow-request";
+
+// Each role's main destinations; NavLink marks the current one.
+const NAV: Record<Role, { href: string; label: string }[]> = {
+  brand: [{ href: "/brand", label: "Dashboard" }],
+  creator: [
+    { href: "/creator", label: "Live campaigns" },
+    { href: "/creator/earnings", label: "My earnings" },
+  ],
+};
 
 /**
  * Frame for one role's pages. It verifies the stored token with /auth/me once per page
@@ -61,7 +69,11 @@ export function SignedInLayout({ role, children }: { role: Role; children: React
     };
     return (
       <AppShell
-        nav={<NavLink href={homePath(user.role)}>Dashboard</NavLink>}
+        nav={NAV[user.role].map(({ href, label }) => (
+          <NavLink key={href} href={href}>
+            {label}
+          </NavLink>
+        ))}
         actions={
           <>
             <span className="hidden max-w-48 truncate font-medium sm:inline">{user.name}</span>

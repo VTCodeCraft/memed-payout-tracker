@@ -97,7 +97,7 @@ export function CreatorCampaign({ id }: { id: string }) {
             {mine.state.status === "success" && posts.length === 0 && (
               <p className="text-muted">You haven&apos;t submitted a post to this campaign yet.</p>
             )}
-            {posts.length > 0 && <SubmissionsTable submissions={posts} campaign={details} labelledBy="your-posts-heading" />}
+            {posts.length > 0 && <SubmissionsTable submissions={posts} campaignOf={() => details} labelledBy="your-posts-heading" />}
           </div>
         </section>
       </div>
