@@ -28,3 +28,33 @@ export function eligiblePayout(views: number, milestones: readonly Milestone[]):
   }
   return payout;
 }
+
+export interface PayoutAmounts {
+  eligiblePayout: number;
+  paidPayout: number;
+  remainingBudget: number;
+}
+
+export interface PayoutAllocation {
+  /** Eligible payout not yet paid: max(0, eligible - paid). */
+  owed: number;
+  /** What can be paid now: owed, capped by the remaining budget, never negative. */
+  grant: number;
+}
+
+/**
+ * Decides how much to pay a submission now. Only the gap between eligible and
+ * already-paid is owed, so repeating the calculation after paying grants 0; when
+ * the budget left is smaller than what is owed, only the remainder is granted.
+ */
+export function allocatePayout(amounts: PayoutAmounts): PayoutAllocation {
+  assertWholeNumber(amounts.eligiblePayout, 'eligiblePayout');
+  assertWholeNumber(amounts.paidPayout, 'paidPayout');
+  if (!Number.isSafeInteger(amounts.remainingBudget)) {
+    throw new RangeError(`remainingBudget must be a safe integer, got ${amounts.remainingBudget}`);
+  }
+
+  const owed = Math.max(0, amounts.eligiblePayout - amounts.paidPayout);
+  const grant = Math.min(owed, Math.max(0, amounts.remainingBudget));
+  return { owed, grant };
+}
