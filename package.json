@@ -1,0 +1,20 @@
+{
+  "name": "memed-payout-tracker",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Meme'd Campaign Payout Tracker: brands run milestone-based creator campaigns, creators earn per view milestone.",
+  "packageManager": "pnpm@10.34.6",
+  "engines": {
+    "node": ">=22 <23"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck"
+  },
+  "devDependencies": {
+    "turbo": "2.11.7"
+  }
+}
