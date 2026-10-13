@@ -1,6 +1,6 @@
 "use client";
 
-import { useSignedInSession } from "@/components/signed-in-layout";
+import { useSignedInSession } from "@/lib/signed-in";
 
 // Interim home until the earnings dashboard is built.
 export default function CreatorHome() {
