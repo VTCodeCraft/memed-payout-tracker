@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Bricolage_Grotesque } from "next/font/google";
+import { TITLE_TEMPLATE } from "@/lib/metadata";
 import "./globals.css";
 
 const bricolage = Bricolage_Grotesque({
@@ -9,8 +10,7 @@ const bricolage = Bricolage_Grotesque({
 });
 
 export const metadata: Metadata = {
-  // Pages set their own title; every tab still names the app ("Log in · Meme'd Payout Tracker").
-  title: { default: "Meme'd Payout Tracker", template: "%s · Meme'd Payout Tracker" },
+  title: { default: "Meme'd Payout Tracker", template: TITLE_TEMPLATE },
   description: "Milestone-based campaign payouts for brands and creators.",
 };
 
