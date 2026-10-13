@@ -4,6 +4,7 @@ import { atLeast } from './validators';
 export const PLATFORMS = ['instagram', 'youtube'] as const;
 export type Platform = (typeof PLATFORMS)[number];
 export const CAMPAIGN_STATUSES = ['live', 'exhausted'] as const;
+export type CampaignStatus = (typeof CAMPAIGN_STATUSES)[number];
 export const MAX_MILESTONES = 10;
 /** Largest amount an Int32 money field can hold (about 214 crore rupees). */
 export const MAX_RUPEES = 2_147_483_647;
@@ -88,7 +89,7 @@ export interface CampaignResponse {
   spent: number;
   remaining: number;
   milestones: Milestone[];
-  status: (typeof CAMPAIGN_STATUSES)[number];
+  status: CampaignStatus;
   createdAt: string;
 }
 

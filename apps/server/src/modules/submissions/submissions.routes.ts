@@ -1,10 +1,12 @@
 import { Router } from 'express';
 import { isDuplicateKeyError } from '../../db/errors';
 import { AppError } from '../../lib/app-error';
+import { idParamsSchema } from '../../lib/validation';
 import { getAuthUser, requireAuth, requireRole } from '../../middleware/auth';
 import { Campaign } from '../../models/campaign.model';
 import { type SubmissionDocument, Submission, toSubmissionResponse } from '../../models/submission.model';
-import { createSubmissionSchema } from './submissions.schemas';
+import { recordViews } from '../payouts/record-views';
+import { createSubmissionSchema, updateViewsSchema } from './submissions.schemas';
 
 export function createSubmissionsRouter(jwtSecret: string): Router {
   const router = Router();
@@ -50,6 +52,14 @@ export function createSubmissionsRouter(jwtSecret: string): Router {
   router.get('/mine', ...creatorOnly, async (req, res) => {
     const submissions = await Submission.find({ creatorId: getAuthUser(req).id }).sort({ createdAt: -1, _id: -1 });
     res.status(200).json({ submissions: submissions.map(toSubmissionResponse) });
+  });
+
+  // No authentication or role check: the brief defines this endpoint as a simulation
+  // of platform view data. Only `views` is read from the body.
+  router.patch('/:id/views', async (req, res) => {
+    const { id } = idParamsSchema.parse(req.params);
+    const { views } = updateViewsSchema.parse(req.body);
+    res.status(200).json(await recordViews(id, views));
   });
 
   return router;
