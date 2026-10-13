@@ -1,8 +1,11 @@
+import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
+import { buttonClasses } from "@/components/button";
+import { PublicHeaderActions } from "@/components/public-header-actions";
 
 export default function Home() {
   return (
-    <AppShell>
+    <AppShell actions={<PublicHeaderActions />}>
       <div className="my-auto">
         <p className="text-sm font-medium lowercase text-muted">
           meme&apos;d · campaign payout tracker
@@ -14,6 +17,9 @@ export default function Home() {
           Brands set a milestone ladder and a budget. Creators submit posts and
           unlock payouts as their views grow.
         </p>
+        <Link href="/signup" className={buttonClasses("primary", "mt-8")}>
+          Get started
+        </Link>
       </div>
     </AppShell>
   );
