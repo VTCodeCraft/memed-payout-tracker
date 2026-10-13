@@ -25,10 +25,13 @@ The Express API on Render returns the JWT in a JSON body and expects `Authorizat
 | `/login`, `/signup` | signed out | `POST auth/login`, `POST auth/signup` | M11 |
 | `/brand` | brand | `GET campaigns/mine`; the create form posts `POST campaigns` and adds the response to the list | M12 |
 | `/brand/campaigns/[id]` | brand | `GET campaigns/:id`, `GET campaigns/:id/submissions` | M12 |
-| `/creator` | creator | `GET submissions/earnings`, `GET submissions/mine` | M13 |
-| `/creator/campaigns` | creator | `GET campaigns/live`, `POST submissions` | M13 |
+| `/creator` | creator | `GET campaigns/live` | M13 |
+| `/creator/campaigns/[id]` | creator | `GET campaigns/:id`, `GET submissions/mine` (this campaign's rows), `POST submissions` | M13 |
+| `/creator/earnings` | creator | `GET submissions/earnings`, `GET submissions/mine`, then `GET campaigns/:id` once per distinct campaign | M13 |
 
 - `/brand` and `/creator` each have a layout (`SignedInLayout`) that checks the stored token with `GET auth/me` once per page load, shows nothing protected until it passes, sends other roles to their own home using the API's role, and renders the app shell. The `(auth)` route group holds login and signup and shows them only to signed-out visitors; route groups do not change URLs.
+- Creator pages never call `GET campaigns/:id/submissions`, the brand's list of every creator's posts; a creator's own posts come only from `GET submissions/mine`.
+- A submission carries only its `campaignId`, so the earnings page reads each distinct campaign by id for its name and ladder (one request per campaign, not per post). If creators come to have many campaigns, returning the campaign name with `GET submissions/mine` would remove those requests.
 - What a signed-in area shows (loading, a redirect, an error, or the page) is decided by the pure function `decideAccess()` in `lib/route-guard.ts`, which is unit tested. Signed-in visitors on login or signup are sent to their home by `SignedOutOnly`.
 - There is no single-submission endpoint, so submission details come from the list responses. `PATCH submissions/:id/views` returns the updated submission, allocation and campaign remaining.
 
