@@ -26,8 +26,9 @@ export default defineConfig({
     },
     {
       // A production build of the frontend that calls the API above. NEXT_PUBLIC_API_URL is
-      // part of Turbo's build hash, so this build and the normal one are cached separately.
-      command: `pnpm turbo run build --filter=frontend && pnpm --filter frontend start --port ${new URL(WEB_URL).port}`,
+      // part of Turbo's build hash, so this build and the normal one are cached separately;
+      // clean-frontend-build.mjs makes sure nothing from an earlier build is served.
+      command: `node apps/e2e/clean-frontend-build.mjs && pnpm turbo run build --filter=frontend && pnpm --filter frontend start --port ${new URL(WEB_URL).port}`,
       cwd: "../..",
       env: { NEXT_PUBLIC_API_URL: API_URL },
       url: WEB_URL,

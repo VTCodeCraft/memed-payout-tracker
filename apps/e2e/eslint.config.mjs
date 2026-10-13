@@ -5,5 +5,5 @@ export default tseslint.config(
   { ignores: ["test-results/**", "playwright-report/**"] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
-  { files: ["start-api.mjs"], languageOptions: { globals: { process: "readonly", URL: "readonly" } } },
+  { files: ["*.mjs"], languageOptions: { globals: { process: "readonly", URL: "readonly" } } },
 );
