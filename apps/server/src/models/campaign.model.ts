@@ -15,9 +15,10 @@ export interface Milestone {
 
 /**
  * Returns the first problem with a milestone ladder, or undefined if it is valid.
- * Shared by request validation and the model so the rules cannot drift apart.
+ * Shared by request validation, the model and the payout engine so the rules
+ * cannot drift apart. The budget check applies only when a budget is given.
  */
-export function milestoneLadderProblem(milestones: readonly Milestone[], totalBudget: number): string | undefined {
+export function milestoneLadderProblem(milestones: readonly Milestone[], totalBudget?: number): string | undefined {
   if (milestones.length === 0) return 'must contain at least one milestone';
   if (milestones.length > MAX_MILESTONES) return `must contain at most ${MAX_MILESTONES} milestones`;
 
@@ -30,7 +31,7 @@ export function milestoneLadderProblem(milestones: readonly Milestone[], totalBu
     if (previous && milestone.payout <= previous.payout) {
       return `${position}: payout must be greater than the previous milestone`;
     }
-    if (milestone.payout > totalBudget) {
+    if (totalBudget !== undefined && milestone.payout > totalBudget) {
       return `${position}: payout cannot exceed the total budget`;
     }
   }
