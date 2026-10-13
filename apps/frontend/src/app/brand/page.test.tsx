@@ -2,7 +2,7 @@ import "../../../test/dom.ts";
 import assert from "node:assert/strict";
 import { afterEach, describe, it, mock } from "node:test";
 import { apiError, json, stubFetch } from "../../../test/fetch.ts";
-import { click, render, settle } from "../../../test/render.tsx";
+import { click, render, settle, typeInto } from "../../../test/render.tsx";
 import type { Campaign } from "../../lib/campaigns.ts";
 import { SignedInContext } from "../../lib/signed-in.ts";
 import BrandDashboard from "./page.tsx";
@@ -154,5 +154,68 @@ describe("brand dashboard", () => {
 
     assert.equal(expired, 1);
     assert.equal(container.querySelector('[role="alert"]'), null);
+  });
+});
+
+describe("creating a campaign from the dashboard", () => {
+  const created: Campaign = {
+    id: "665f1c2e8b3e4a0000000003",
+    name: "Holi reels",
+    platform: "instagram",
+    totalBudget: 3000,
+    spent: 0,
+    remaining: 3000,
+    milestones: [{ views: 20000, payout: 1000 }],
+    status: "live",
+    createdAt: "2026-10-13T12:00:00.000Z",
+  };
+  const button = (container: Element, label: string) =>
+    [...container.querySelectorAll("button")].find((element) => element.textContent === label);
+
+  afterEach(() => {
+    mock.restoreAll();
+    document.body.innerHTML = "";
+  });
+
+  it("puts the new campaign at the top of the list without reloading it", async () => {
+    const calls = stubFetch((call) => (call.method === "POST" ? json(201, { campaign: created }) : json(200, { campaigns: [live] })));
+    const { container } = await renderDashboard();
+
+    await click(button(container, "Create campaign"));
+    assert.equal(document.activeElement?.textContent, "New campaign");
+    await typeInto(container.querySelector('input[name="name"]'), "Holi reels");
+    await click(container.querySelector('input[value="instagram"]'));
+    await typeInto(container.querySelector('input[name="totalBudget"]'), "3000");
+    await typeInto(container.querySelector('input[name="milestones.0.views"]'), "20000");
+    await typeInto(container.querySelector('input[name="milestones.0.payout"]'), "1000");
+    await click(container.querySelector('form button[type="submit"]'));
+    await settle();
+
+    assert.deepEqual(
+      calls.map(({ method }) => method),
+      ["GET", "POST"],
+      "the list is not fetched again",
+    );
+    assert.deepEqual(
+      [...container.querySelectorAll("li h2")].map((heading) => heading.textContent),
+      ["Holi reels", "Diwali clips"],
+    );
+    assert.equal(container.querySelector("form"), null);
+    const notice = container.querySelector('[role="status"]');
+    assert.equal(notice?.textContent, "“Holi reels” is live. Creators can submit posts to it now.");
+    assert.equal(document.activeElement, notice);
+  });
+
+  it("closes the form on Cancel and returns focus to the button that opened it", async () => {
+    stubFetch(() => json(200, { campaigns: [] }));
+    const { container } = await renderDashboard();
+
+    await click(button(container, "Create campaign"));
+    assert.equal(container.querySelector("h2")?.textContent, "New campaign");
+    await click(button(container, "Cancel"));
+
+    assert.equal(container.querySelector("form"), null);
+    assert.equal(document.activeElement, button(container, "Create campaign"));
+    assert.equal(container.querySelector("h2")?.textContent, "No campaigns yet");
   });
 });

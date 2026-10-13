@@ -1,6 +1,6 @@
 import { type FormEvent, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import type { FieldProblems, FormFeedback } from "./auth.ts";
+import type { FieldProblems, FormFeedback } from "./form-feedback.ts";
 import { focusFirstProblem } from "./focus-first-problem.ts";
 import { useSlowRequest } from "./use-slow-request.ts";
 
@@ -54,5 +54,9 @@ export function useFormSubmit<Values, Input>({ fields, values, check, submit, de
     }
   }
 
-  return { feedback, pending, slow, handleSubmit };
+  // For forms whose fields change shape, such as removing a milestone row, which would
+  // leave index-keyed messages beside the wrong inputs.
+  const clearFeedback = () => setFeedback({ fields: {} });
+
+  return { feedback, pending, slow, handleSubmit, clearFeedback };
 }

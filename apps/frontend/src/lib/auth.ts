@@ -1,4 +1,5 @@
-import { ApiError, apiRequest, fieldErrors } from "./api-client.ts";
+import { ApiError, apiRequest } from "./api-client.ts";
+import { type FieldProblems, type FormFeedback, validationFeedback } from "./form-feedback.ts";
 import { type Role, type Session, type User, SessionStorageError, saveSession } from "./session.ts";
 
 /** Body of a successful POST /auth/signup (201) or POST /auth/login (200). */
@@ -13,9 +14,6 @@ const HOME_BY_ROLE: Record<Role, string> = { brand: "/brand", creator: "/creator
 export function homePath(role: Role): string {
   return HOME_BY_ROLE[role];
 }
-
-/** Validation messages keyed by field name, worded like the API's own. */
-export type FieldProblems = Record<string, string>;
 
 export interface SignupForm {
   name: string;
@@ -95,13 +93,6 @@ export async function signUp(input: SignupInput): Promise<Session> {
   return saveSession(token, user);
 }
 
-export interface FormFeedback {
-  /** Messages for individual fields, keyed by field name. */
-  fields: FieldProblems;
-  /** A message for the whole form, when the problem belongs to no single field. */
-  message?: string;
-}
-
 /** Turns a failed signup or login into what the form shows. */
 export function authFailure(error: unknown, formFields: readonly string[]): FormFeedback {
   if (error instanceof SessionStorageError) return { fields: {}, message: error.message };
@@ -111,12 +102,8 @@ export function authFailure(error: unknown, formFields: readonly string[]): Form
   }
 
   switch (error.code) {
-    case "VALIDATION_ERROR": {
-      const all = Object.entries(fieldErrors(error));
-      const fields = Object.fromEntries(all.filter(([path]) => formFields.includes(path)));
-      const unmatched = all.length > Object.keys(fields).length || all.length === 0;
-      return { fields, message: unmatched ? "Some details were not accepted. Check the form and try again." : undefined };
-    }
+    case "VALIDATION_ERROR":
+      return validationFeedback(error, (path) => formFields.includes(path));
     case "INVALID_CREDENTIALS":
       // The API uses one answer for an unknown email and a wrong password; so does this.
       return { fields: {}, message: "That email and password don't match an account. Check both and try again." };
