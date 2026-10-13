@@ -3,6 +3,11 @@ import mongoose from 'mongoose';
 import { createApp } from './app';
 import { loadEnv } from './config/env';
 import { connectToDatabase } from './db/connection';
+import { createShutdown } from './shutdown';
+
+// Render sends SIGTERM on every deploy and kills the process after its grace
+// period; finishing within 10 seconds keeps well inside it.
+const SHUTDOWN_TIMEOUT_MS = 10_000;
 
 async function main(): Promise<void> {
   // Local development reads apps/server/.env; deployed environments provide real variables.
@@ -13,10 +18,19 @@ async function main(): Promise<void> {
   await connectToDatabase(env.mongodbUri);
   console.log(`Connected to MongoDB database "${mongoose.connection.name}"`);
 
-  createApp({ corsOrigins: env.corsOrigins, jwt: env.jwt }).listen(env.port, () => {
+  const server = createApp({ corsOrigins: env.corsOrigins, jwt: env.jwt }).listen(env.port, () => {
     console.log(`API listening on http://localhost:${env.port} (${env.nodeEnv})`);
     console.log(`CORS allowed origins: ${env.corsOrigins.join(', ')}`);
   });
+
+  const shutdown = createShutdown({
+    server,
+    closeResources: () => mongoose.disconnect(),
+    timeoutMs: SHUTDOWN_TIMEOUT_MS,
+    exit: (code) => process.exit(code),
+  });
+  process.once('SIGTERM', () => void shutdown('SIGTERM'));
+  process.once('SIGINT', () => void shutdown('SIGINT'));
 }
 
 main().catch((error: unknown) => {
