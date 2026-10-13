@@ -3,8 +3,11 @@ packages:
 
 # Install scripts intentionally skipped: these packages ship prebuilt
 # platform binaries via optional dependencies, verified working without them.
+# mongodb-memory-server downloads mongod lazily on the first test run instead,
+# which keeps the multi-hundred-MB binary out of production installs.
 ignoredBuiltDependencies:
   - "@parcel/watcher"
   - esbuild
+  - mongodb-memory-server
   - sharp
   - unrs-resolver
