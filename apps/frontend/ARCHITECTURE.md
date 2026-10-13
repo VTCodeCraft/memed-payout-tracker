@@ -23,9 +23,8 @@ The Express API on Render returns the JWT in a JSON body and expects `Authorizat
 |---|---|---|---|
 | `/` | anyone | none | exists |
 | `/login`, `/signup` | signed out | `POST auth/login`, `POST auth/signup` | M11 |
-| `/brand` | brand | `GET campaigns/mine`, totals summed from the list | M12 |
-| `/brand/campaigns/new` | brand | `POST campaigns` | M12 |
-| `/brand/campaigns/[id]` | brand | `GET campaigns/:id`, `GET campaigns/:id/submissions`, `PATCH submissions/:id/views` | M12 |
+| `/brand` | brand | `GET campaigns/mine`; the create form posts `POST campaigns` and adds the response to the list | M12 |
+| `/brand/campaigns/[id]` | brand | `GET campaigns/:id`, `GET campaigns/:id/submissions` | M12 |
 | `/creator` | creator | `GET submissions/earnings`, `GET submissions/mine` | M13 |
 | `/creator/campaigns` | creator | `GET campaigns/live`, `POST submissions` | M13 |
 
@@ -59,3 +58,7 @@ Tokens live in `src/app/globals.css`, each with its source.
 - Pills for buttons and badges; 16px-radius cards with an ink border.
 - Lowercase only for decorative eyebrow text, never for data, labels or buttons.
 - Numbers that line up in columns use `tabular-nums` (Bricolage Grotesque supports it).
+
+## Tests
+
+`pnpm test` runs `node --test` with `test/register.mjs`, which compiles `.tsx` and resolves `@/` the way Next does. Logic in `src/lib` is tested directly. Component tests (`*.test.tsx`) import `test/dom.ts` first for a happy-dom document, render with `test/render.tsx`, and stub `fetch` with `test/fetch.ts`; pages that need a session are wrapped in `SignedInContext`.
