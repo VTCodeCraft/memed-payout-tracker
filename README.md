@@ -48,7 +48,7 @@ flowchart LR
 | Cache | Optional Redis through `@redis/client`, for the live campaign list only; not used in production |
 | Auth | JWT (HS256) in a Bearer header; bcrypt password hashes |
 | Tests | Jest + supertest + mongodb-memory-server (API); `node --test` + happy-dom (frontend); Playwright (browser) |
-| Tooling | pnpm workspaces, Turborepo |
+| Tooling | pnpm workspaces, Turborepo; Docker Compose for local runs |
 
 **Request flow.** The browser calls the API directly with the JWT in an `Authorization: Bearer` header (the API sets no cookies). Each route checks the token and role, validates the body with zod, and answers JSON; errors always have the shape `{ "error": { "code", "message", "details"? } }`.
 
@@ -64,7 +64,7 @@ apps/e2e        Playwright browser tests and the scripts that start the app for 
 
 ## Run it locally
 
-**Prerequisites:** Node.js 22 (see `.nvmrc`) and pnpm 10.34.6. With Corepack, `corepack enable` picks up the pinned pnpm from `package.json`. You also need a MongoDB **replica set** (next section).
+**Prerequisites:** Node.js 22 (see `.nvmrc`) and pnpm 10.34.6. With Corepack, `corepack enable` picks up the pinned pnpm from `package.json`. You also need a MongoDB **replica set** (next section), which [Docker](#docker) can provide.
 
 ```bash
 pnpm install --frozen-lockfile
@@ -74,8 +74,9 @@ pnpm install --frozen-lockfile
 
 The API needs a MongoDB that is a replica set, because view updates run in transactions. On a standalone MongoDB the app starts and most pages work, but the first view update fails with `500 INTERNAL_ERROR`.
 
-- **Atlas (simplest):** a free cluster is already a replica set. Create a database user, allow your IP, and use its `mongodb+srv://…` connection string with a database name, e.g. `/memed_dev`.
-- **Local MongoDB:** start a single-node replica set and initiate it once:
+- **Docker:** `docker compose up -d mongo` starts MongoDB 8.2 as a single-node replica set on `127.0.0.1:27018`, and initiates it itself. Use `MONGODB_URI=mongodb://127.0.0.1:27018/memed_dev?directConnection=true`: the replica set names its member `mongo`, which only resolves inside Docker, so the driver must connect to it directly. Transactions work this way (checked: a committed write persists, an aborted one leaves nothing, and concurrent writes to one document raise a `WriteConflict`). For the optional cache, `docker compose up -d redis` and `REDIS_URL=redis://127.0.0.1:6379`.
+- **Atlas:** a free cluster is already a replica set. Create a database user, allow your IP, and use its `mongodb+srv://…` connection string with a database name, e.g. `/memed_dev`.
+- **Local MongoDB without Docker:** start a single-node replica set and initiate it once:
   ```bash
   mkdir data
   mongod --replSet rs0 --dbpath ./data --port 27017
@@ -110,6 +111,30 @@ pnpm dev
 
 This starts the API on http://localhost:4000 and the frontend on http://localhost:3000. If port 3000 is taken, Next.js moves to the next free port and prints it; the API's development CORS default allows 3000 and 3001, so set `CORS_ORIGINS` if the frontend ends up elsewhere.
 
+### Docker
+
+`compose.yaml` runs MongoDB, Redis, the API and the web app on your machine. It is for local work only: production stays on Vercel and Render. With Docker running:
+
+```bash
+cp .env.example .env           # then set JWT_SECRET; the API refuses the placeholder
+docker compose up -d --build   # the whole stack, from production builds
+docker compose ps              # wait until all four services are "healthy"
+```
+
+The web app is then at http://localhost:3200 and the API at http://localhost:4200. For development with hot reload, start only the databases instead (`docker compose up -d mongo redis`, which needs no `.env`) and run `pnpm dev` with the connection strings from [MongoDB](#mongodb).
+
+| Service | Image | Host port | Ready when |
+|---|---|---|---|
+| `mongo` | `mongo:8.2.12`, replica set `rs0` | 27018 | the replica set is initiated and this node is primary |
+| `redis` | `redis:8.2.10-alpine`, nothing kept on disk | 6379 | `redis-cli ping` answers |
+| `api` | `apps/server/Dockerfile`, database `memed_docker`, cache on | 4200 | `GET /api/health` answers 200 |
+| `web` | `apps/frontend/Dockerfile` | 3200 | `GET /` answers |
+
+- The API waits for a healthy MongoDB but only a started Redis, since it works without its cache; the web app waits for a healthy API.
+- Every port is bound to `127.0.0.1`, because nothing has a password locally. Ports can be changed in `.env`; the web image has the API's address built in (`NEXT_PUBLIC_API_URL`), so rebuild with `--build` after changing `API_PORT`.
+- MongoDB's data is kept in the `memed_mongo-data` volume across restarts. `docker compose down` stops everything; **`docker compose down -v` also deletes that volume**, which wipes the local Docker databases (and nothing else: Atlas and production are not touched). Redis keeps nothing on disk.
+- Both images run as a non-root user with production dependencies only; no `.env` file enters an image (see `.dockerignore`).
+
 ## Tests and checks
 
 ```bash
@@ -123,7 +148,7 @@ pnpm e2e         # browser tests (separate: needs a browser, takes about a minut
 | Layer | What it proves | Count |
 |---|---|---|
 | API unit (`apps/server/tests/unit`) | Payout engine, view-spike rule, cache fail-open rules (timeouts, rejections, malformed data), ladder rules, URL normalisation, validation schemas, env checks | 205 |
-| API integration (`apps/server/tests/integration`) | Every endpoint over HTTP against an in-memory MongoDB replica set: auth, roles, ownership, payouts, partial payouts, exhaustion, view spikes, the live-list cache (invalidation, fallback), concurrency, the whole brand-to-creator workflow; the Redis client against an unreachable server | 198, plus 1 skipped (needs a real Redis) |
+| API integration (`apps/server/tests/integration`) | Every endpoint over HTTP against an in-memory MongoDB replica set: auth, roles, ownership, payouts, partial payouts, exhaustion, view spikes, the live-list cache (invalidation, fallback), concurrency, the whole brand-to-creator workflow; the Redis client against an unreachable server, and against a real Redis when one is given | 198, plus 6 that need a real Redis (all 204 pass with one) |
 | Frontend unit (`apps/frontend/src/**/*.test.ts`) | API client, session store, route decisions, form checks, formatting | 75 |
 | Frontend component (`apps/frontend/src/**/*.test.tsx`) | React pages rendered in happy-dom with `fetch` stubbed: loading, empty, error, retry, validation, duplicate submits | 52 |
 | Browser E2E (`apps/e2e/tests`) | Real Chromium against a production build and the real API on a throwaway database: the full workflow, route protection, reloads, expired sessions, cross-tab logout, isolation, network failures | 9 |
@@ -133,6 +158,15 @@ The first API test run downloads a MongoDB binary for the in-memory database. On
 ```bash
 pnpm --filter e2e exec playwright install chromium
 ```
+
+**Tests against a real Redis.** Six API tests (`apps/server/tests/integration/redis.real.test.ts`) are skipped unless `REDIS_TEST_URL` is set. They delete keys, drop connections and pause the server, so they only accept a local URL; point them at the Compose Redis (a Docker API using it reconnects by itself):
+
+```bash
+docker compose up -d redis
+REDIS_TEST_URL=redis://127.0.0.1:6379 pnpm --filter server test
+```
+
+In PowerShell, set it first with `$env:REDIS_TEST_URL = "redis://127.0.0.1:6379"`.
 
 `pnpm e2e` builds the API and the frontend (pointed at `http://localhost:4100`), starts them on ports 4100 and 3100 (which must be free), runs the tests, and stops them. The browser tests run locally only; there is no CI pipeline. Checks of the deployed site (production configuration, the live workflow against Atlas) were done by hand and are not automated.
 
@@ -280,7 +314,7 @@ Optional, and off in production. With `REDIS_URL` set, the creators' live campai
 
 **How stale can the list be?** Normally not at all, because changes delete it. Two cases can leave it stale for up to 60 seconds: a read that began before a payment committed stores the older figures just after the delete, or a delete is lost because Redis was unreachable at that moment. The worst effect is a card showing an old spend, or an exhausted campaign still listed; opening it reads MongoDB, and submitting a post to it is refused (`409 CAMPAIGN_NOT_LIVE`).
 
-**Testing and status.** Unit tests cover the 250 ms bound (with a store that never answers), rejections, malformed data and log volume; integration tests check invalidation, fallback, the auth check before the cache, and that submissions and payouts ignore cached figures; the real Redis client is run against an unreachable server. **It has not been run against a real Redis server yet:** that test needs `REDIS_TEST_URL` and is skipped until the Docker setup provides one. To try the cache locally, run any Redis and set `REDIS_URL=redis://localhost:6379` in `apps/server/.env`.
+**Testing and status.** Unit tests cover the 250 ms bound (with a store that never answers), rejections, malformed data and log volume; integration tests check invalidation, fallback, the auth check before the cache, and that submissions and payouts ignore cached figures; the real Redis client is run against an unreachable server. Against a real Redis 8.2 (the Compose service), six more tests check that keys expire after their time to live, the cached list's 60-second TTL and hits, invalidation on creation and payment with payout invariants intact, reconnection after Redis drops the connection, and the MongoDB fallback while Redis is paused (see [Tests and checks](#tests-and-checks)). In the full Docker stack, stopping the Redis container leaves the live list served from MongoDB, and starting it again reconnects the API on its own. To use the cache locally, start Redis (`docker compose up -d redis`) and set `REDIS_URL=redis://127.0.0.1:6379` in `apps/server/.env`, or run the whole Docker stack, where it is on.
 
 ## Decisions and assumptions
 
@@ -312,4 +346,4 @@ These settings live in the Vercel and Render dashboards, not in the repository. 
 - **Earnings page requests:** submissions carry only a campaign id, so the creator's earnings page fetches each distinct campaign once to show its name.
 - **Tests:** browser tests run locally with Chromium only; there is no CI. Production checks are manual.
 - **Database user:** development and production use one Atlas user with access to both databases; separate users per environment would be safer.
-- **Optional items from the brief that are not implemented:** Docker and a scaling note. Implemented and tested: concurrent payout safety, view-spike flagging (with the limitations listed in [View-spike flag](#view-spike-flag)), and Redis caching of the live campaign list (not deployed, and not yet run against a real Redis server; see [Live campaign cache](#live-campaign-cache-redis)).
+- **Optional items from the brief that are not implemented:** a scaling note. Implemented and tested: concurrent payout safety, view-spike flagging (with the limitations listed in [View-spike flag](#view-spike-flag)), Redis caching of the live campaign list (tested against a real Redis locally, not deployed; see [Live campaign cache](#live-campaign-cache-redis)), and Docker for local runs (see [Docker](#docker); production does not use it).
