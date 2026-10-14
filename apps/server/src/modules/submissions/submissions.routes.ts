@@ -1,4 +1,5 @@
 import { type RequestHandler, Router } from 'express';
+import type { LiveCampaignsCache } from '../../cache/live-campaigns-cache';
 import { isDuplicateKeyError } from '../../db/errors';
 import { AppError } from '../../lib/app-error';
 import { idParamsSchema } from '../../lib/validation';
@@ -9,7 +10,11 @@ import { recordViews } from '../payouts/record-views';
 import { creatorEarnings } from './earnings';
 import { createSubmissionSchema, updateViewsSchema } from './submissions.schemas';
 
-export function createSubmissionsRouter(jwtSecret: string, viewUpdateLimiter: RequestHandler): Router {
+export function createSubmissionsRouter(
+  jwtSecret: string,
+  viewUpdateLimiter: RequestHandler,
+  liveCampaigns: LiveCampaignsCache,
+): Router {
   const router = Router();
   // Applied per route rather than router-wide: the brief's view-update endpoint on
   // this router takes no role check.
@@ -65,7 +70,13 @@ export function createSubmissionsRouter(jwtSecret: string, viewUpdateLimiter: Re
   router.patch('/:id/views', viewUpdateLimiter, async (req, res) => {
     const { id } = idParamsSchema.parse(req.params);
     const { views } = updateViewsSchema.parse(req.body);
-    res.status(200).json(await recordViews(id, views));
+    const result = await recordViews(id, views);
+    // A payment changes the campaign's spent figure and may exhaust it. recordViews has
+    // returned, so its transaction has committed and every list read from here on sees
+    // it. (A read that began before the commit can still store the old figures; the
+    // cache's 60 s expiry bounds that.)
+    if (result.allocation.grantedNow > 0) await liveCampaigns.invalidate();
+    res.status(200).json(result);
   });
 
   return router;

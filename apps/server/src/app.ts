@@ -1,5 +1,6 @@
 import cors from 'cors';
 import express, { type Express } from 'express';
+import { type LiveCampaignsCache, noLiveCampaignsCache } from './cache/live-campaigns-cache';
 import type { JwtConfig } from './lib/jwt';
 import { errorHandler, notFoundHandler } from './middleware/errors';
 import { DEFAULT_RATE_LIMITS, type RateLimits, createRateLimiter } from './middleware/rate-limit';
@@ -14,13 +15,20 @@ export interface AppOptions {
   jwt: JwtConfig;
   /** Per-client request limits; production defaults unless a test overrides them. */
   rateLimits?: RateLimits;
+  /** Cache for the creators' live campaign list; none unless Redis is configured. */
+  liveCampaignsCache?: LiveCampaignsCache;
 }
 
 /**
  * Builds the Express application without binding a port,
  * so tests can exercise it in-process via supertest.
  */
-export function createApp({ corsOrigins, jwt, rateLimits = DEFAULT_RATE_LIMITS }: AppOptions): Express {
+export function createApp({
+  corsOrigins,
+  jwt,
+  rateLimits = DEFAULT_RATE_LIMITS,
+  liveCampaignsCache = noLiveCampaignsCache,
+}: AppOptions): Express {
   const app = express();
 
   app.disable('x-powered-by');
@@ -31,8 +39,11 @@ export function createApp({ corsOrigins, jwt, rateLimits = DEFAULT_RATE_LIMITS }
 
   app.use('/api', healthRouter);
   app.use('/api/auth', createAuthRouter(jwt, createRateLimiter(rateLimits.auth)));
-  app.use('/api/campaigns', createCampaignsRouter(jwt.secret));
-  app.use('/api/submissions', createSubmissionsRouter(jwt.secret, createRateLimiter(rateLimits.viewUpdates)));
+  app.use('/api/campaigns', createCampaignsRouter(jwt.secret, liveCampaignsCache));
+  app.use(
+    '/api/submissions',
+    createSubmissionsRouter(jwt.secret, createRateLimiter(rateLimits.viewUpdates), liveCampaignsCache),
+  );
 
   // Registered last: anything unmatched is a 404, and every error becomes JSON.
   app.use(notFoundHandler);

@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import type { LiveCampaignsCache } from '../../cache/live-campaigns-cache';
 import { AppError } from '../../lib/app-error';
 import { idParamsSchema } from '../../lib/validation';
 import { getAuthUser, requireAuth, requireRole } from '../../middleware/auth';
@@ -6,13 +7,15 @@ import { Campaign, toCampaignResponse } from '../../models/campaign.model';
 import { Submission, toSubmissionResponse } from '../../models/submission.model';
 import { createCampaignSchema } from './campaigns.schemas';
 
-export function createCampaignsRouter(jwtSecret: string): Router {
+export function createCampaignsRouter(jwtSecret: string, liveCampaigns: LiveCampaignsCache): Router {
   const router = Router();
   router.use(requireAuth(jwtSecret));
 
   router.post('/', requireRole('brand'), async (req, res) => {
     const input = createCampaignSchema.parse(req.body);
     const campaign = await Campaign.create({ ...input, brandId: getAuthUser(req).id });
+    // The new campaign is live at once, so creators must not keep a cached list without it.
+    await liveCampaigns.invalidate();
     res.status(201).json({ campaign: toCampaignResponse(campaign) });
   });
 
@@ -22,10 +25,19 @@ export function createCampaignsRouter(jwtSecret: string): Router {
     res.status(200).json({ campaigns: campaigns.map(toCampaignResponse) });
   });
 
-  // The brief lists "list live campaigns" as a creator feature.
+  // The brief lists "list live campaigns" as a creator feature. The list is discovery data,
+  // so it may come from the cache (up to 60 s stale); submitting a post and paying for one
+  // always re-read the campaign from MongoDB.
   router.get('/live', requireRole('creator'), async (_req, res) => {
-    const campaigns = await Campaign.find({ status: 'live' }).sort({ createdAt: -1, _id: -1 });
-    res.status(200).json({ campaigns: campaigns.map(toCampaignResponse) });
+    const cached = await liveCampaigns.read();
+    if (cached) {
+      res.status(200).json({ campaigns: cached });
+      return;
+    }
+
+    const campaigns = (await Campaign.find({ status: 'live' }).sort({ createdAt: -1, _id: -1 })).map(toCampaignResponse);
+    res.status(200).json({ campaigns });
+    await liveCampaigns.write(campaigns); // after responding: a slow cache never delays a miss
   });
 
   // Creators may open any campaign to read its ladder; brands only their own.

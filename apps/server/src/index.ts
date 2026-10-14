@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import mongoose from 'mongoose';
 import { createApp } from './app';
+import { createLiveCampaignsCache } from './cache/live-campaigns-cache';
 import { createRedisStore } from './cache/redis-store';
 import { loadEnv } from './config/env';
 import { connectToDatabase } from './db/connection';
@@ -23,7 +24,11 @@ async function main(): Promise<void> {
   const redis = env.redisUrl ? createRedisStore(env.redisUrl) : undefined;
   console.log(redis ? 'Redis cache: enabled for the live campaign list' : 'Redis cache: disabled (REDIS_URL not set)');
 
-  const server = createApp({ corsOrigins: env.corsOrigins, jwt: env.jwt }).listen(env.port, () => {
+  const server = createApp({
+    corsOrigins: env.corsOrigins,
+    jwt: env.jwt,
+    liveCampaignsCache: redis ? createLiveCampaignsCache(redis) : undefined,
+  }).listen(env.port, () => {
     console.log(`API listening on http://localhost:${env.port} (${env.nodeEnv})`);
     console.log(`CORS allowed origins: ${env.corsOrigins.join(', ')}`);
   });
