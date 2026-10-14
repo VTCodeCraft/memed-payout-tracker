@@ -1,0 +1,92 @@
+# Local Docker setup; production stays on Vercel (web) and Render (API).
+#   docker compose up -d mongo redis   # databases only: run the apps with `pnpm dev`
+#   docker compose up -d --build       # the whole stack from production builds
+# The api service needs JWT_SECRET: copy .env.example to .env (git-ignored) and set it.
+# Every port is bound to 127.0.0.1, so nothing here is reachable from the network.
+
+name: memed
+
+services:
+  mongo:
+    image: mongo:8.2.12
+    # A single-node replica set: the MongoDB transactions every view update uses need one.
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    ports:
+      - "127.0.0.1:${MONGO_PORT:-27018}:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      # Initiates the replica set on the first start, then is healthy once this node is primary.
+      test:
+        - CMD
+        - mongosh
+        - --quiet
+        - --eval
+        - "try { rs.status() } catch (e) { rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: 'mongo:27017' }] }) } if (!db.hello().isWritablePrimary) quit(1)"
+      interval: 5s
+      timeout: 10s
+      start_period: 30s
+      retries: 12
+
+  redis:
+    image: redis:8.2.10-alpine
+    # A cache only: no snapshots and no append-only file, so nothing is kept on disk.
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+    environment:
+      NODE_ENV: production
+      PORT: "4000"
+      MONGODB_URI: mongodb://mongo:27017/memed_docker?replicaSet=rs0
+      REDIS_URL: redis://redis:6379
+      # Left blank when unset, so the databases can start without a .env; the API then
+      # refuses to start and names JWT_SECRET.
+      JWT_SECRET: ${JWT_SECRET:-}
+      CORS_ORIGINS: http://localhost:${WEB_PORT:-3200}
+    ports:
+      - "127.0.0.1:${API_PORT:-4200}:4000"
+    depends_on:
+      mongo:
+        condition: service_healthy
+      # Started, not healthy: the API works without its cache, so Redis cannot hold it up.
+      redis:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:4000/api/health"]
+      interval: 10s
+      timeout: 5s
+      start_period: 20s
+      retries: 6
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/frontend/Dockerfile
+      args:
+        # The browser calls the API through its published port, not the service name.
+        NEXT_PUBLIC_API_URL: http://localhost:${API_PORT:-4200}
+    ports:
+      - "127.0.0.1:${WEB_PORT:-3200}:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000/"]
+      interval: 10s
+      timeout: 5s
+      start_period: 20s
+      retries: 6
+
+volumes:
+  # Local MongoDB data survives restarts; `docker compose down -v` deletes it.
+  mongo-data:
