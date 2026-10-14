@@ -69,6 +69,7 @@ describe('submission endpoints', () => {
           views: 0,
           eligiblePayout: 0,
           paidPayout: 0,
+          viewSpike: null,
           createdAt: expect.any(String),
         },
       });

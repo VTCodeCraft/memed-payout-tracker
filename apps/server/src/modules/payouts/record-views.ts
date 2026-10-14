@@ -7,6 +7,7 @@ import {
   type SubmissionResponse,
   toSubmissionResponse,
 } from '../../models/submission.model';
+import { viewSpikeRate } from '../submissions/view-spike';
 import { allocatePayout, eligiblePayout } from './payout-engine';
 
 export type PayoutOutcome = 'no_change' | 'no_new_payout' | 'paid' | 'partial' | 'budget_exhausted';
@@ -15,6 +16,8 @@ export interface ViewsUpdateResult {
   submission: SubmissionResponse;
   allocation: { grantedNow: number; unfundedPayout: number; outcome: PayoutOutcome };
   campaign: { remaining: number; status: CampaignStatus };
+  /** Whether this update grew the views fast enough to be recorded as a spike. */
+  viewSpikeDetected: boolean;
 }
 
 const MAX_ATTEMPTS = 3;
@@ -65,8 +68,19 @@ async function applyViews(submissionId: string, views: number, session: ClientSe
   if (views === submission.views) {
     // Same count reported again: nothing to record, so nothing can be paid twice.
     const unfundedPayout = Math.max(0, submission.eligiblePayout - submission.paidPayout);
-    return result(submission, campaign, { grantedNow: 0, unfundedPayout, outcome: 'no_change' });
+    return result(submission, campaign, { grantedNow: 0, unfundedPayout, outcome: 'no_change' }, false);
   }
+
+  // A review signal only: it is computed from the same snapshot and saved by the same
+  // conditional write as the payout below, and nothing about the payout depends on it.
+  const now = new Date();
+  const viewsPerHour = viewSpikeRate({
+    previousViews: submission.views,
+    views,
+    elapsedMs: now.getTime() - submission.updatedAt.getTime(),
+  });
+  const viewSpike =
+    viewsPerHour === null ? {} : { viewSpike: { detectedAt: now, fromViews: submission.views, toViews: views, viewsPerHour } };
 
   const remainingBudget = campaign.totalBudget - campaign.spent;
   const eligible = eligiblePayout(views, campaign.milestones);
@@ -94,16 +108,17 @@ async function applyViews(submissionId: string, views: number, session: ClientSe
   // never be applied to this submission twice.
   const updatedSubmission = await Submission.findOneAndUpdate(
     { _id: submission._id, views: submission.views, paidPayout: submission.paidPayout },
-    { $set: { views, eligiblePayout: eligible }, $inc: { paidPayout: grant } },
+    { $set: { views, eligiblePayout: eligible, ...viewSpike }, $inc: { paidPayout: grant } },
     { session, returnDocument: 'after' },
   );
   if (!updatedSubmission) throw new StaleWriteError();
 
-  return result(updatedSubmission, updatedCampaign, {
-    grantedNow: grant,
-    unfundedPayout: owed - grant,
-    outcome: outcomeOf(owed, grant),
-  });
+  return result(
+    updatedSubmission,
+    updatedCampaign,
+    { grantedNow: grant, unfundedPayout: owed - grant, outcome: outcomeOf(owed, grant) },
+    viewsPerHour !== null,
+  );
 }
 
 function outcomeOf(owed: number, grant: number): PayoutOutcome {
@@ -116,10 +131,12 @@ function result(
   submission: SubmissionDocument,
   campaign: CampaignDocument,
   allocation: ViewsUpdateResult['allocation'],
+  viewSpikeDetected: boolean,
 ): ViewsUpdateResult {
   return {
     submission: toSubmissionResponse(submission),
     allocation,
     campaign: { remaining: campaign.totalBudget - campaign.spent, status: campaign.status },
+    viewSpikeDetected,
   };
 }

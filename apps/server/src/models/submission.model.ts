@@ -2,6 +2,18 @@ import { type HydratedDocument, type InferSchemaType, Schema, model } from 'mong
 import { PLATFORMS, type Platform } from './campaign.model';
 import { atLeast } from './validators';
 
+// The latest view update that grew faster than the spike rule allows (see view-spike.ts),
+// kept as evidence for a person to review. It never affects what is earned or paid.
+const viewSpikeSchema = new Schema(
+  {
+    detectedAt: { type: Date, required: true },
+    fromViews: { type: Number, required: true, min: 0 },
+    toViews: { type: Number, required: true, min: 0 },
+    viewsPerHour: { type: Number, required: true, min: 0 },
+  },
+  { _id: false },
+);
+
 const submissionSchema = new Schema(
   {
     campaignId: { type: Schema.Types.ObjectId, ref: 'Campaign', required: true, immutable: true },
@@ -22,7 +34,10 @@ const submissionSchema = new Schema(
     // separately from paid (actually allocated from the campaign budget).
     eligiblePayout: { type: Schema.Types.Int32, required: true, default: 0, validate: atLeast(0) },
     paidPayout: { type: Schema.Types.Int32, required: true, default: 0, validate: atLeast(0) },
+    viewSpike: { type: viewSpikeSchema, required: false },
   },
+  // After creation only view updates write a submission, so updatedAt is also when the
+  // current view count was recorded: the spike rule measures elapsed time from it.
   { timestamps: true },
 );
 
@@ -49,10 +64,13 @@ export interface SubmissionResponse {
   views: number;
   eligiblePayout: number;
   paidPayout: number;
+  /** The latest view spike, or null if the views never grew unusually fast. */
+  viewSpike: { detectedAt: string; fromViews: number; toViews: number; viewsPerHour: number } | null;
   createdAt: string;
 }
 
 export function toSubmissionResponse(submission: SubmissionDocument): SubmissionResponse {
+  const spike = submission.viewSpike;
   return {
     id: submission.id,
     campaignId: submission.campaignId.toString(),
@@ -62,6 +80,9 @@ export function toSubmissionResponse(submission: SubmissionDocument): Submission
     views: submission.views,
     eligiblePayout: submission.eligiblePayout,
     paidPayout: submission.paidPayout,
+    viewSpike: spike
+      ? { detectedAt: spike.detectedAt.toISOString(), fromViews: spike.fromViews, toViews: spike.toViews, viewsPerHour: spike.viewsPerHour }
+      : null,
     createdAt: submission.createdAt.toISOString(),
   };
 }
