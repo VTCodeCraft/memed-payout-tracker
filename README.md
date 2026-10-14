@@ -23,7 +23,7 @@ A captioned recording of the whole workflow is made by a script, so it always sh
 pnpm --filter e2e demo
 ```
 
-It builds both apps, runs them on the browser tests' throwaway stack (ports 4100 and 3100, with an in-memory MongoDB that disappears afterwards), plays the workflow in Chromium, and writes a 1280×720 video of about 2½ minutes to `apps/e2e/test-results/demo/<test name>/video.webm`. The folder is git-ignored and replaced on every run; nothing touches the live site.
+It builds both apps, runs them on the browser tests' throwaway stack (ports 4100 and 3100, with an in-memory MongoDB that disappears afterwards), plays the workflow in Chromium, and writes a 1280×720 video of about 2½ minutes to `apps/e2e/demo-results/<test name>/video.webm`. That folder is git-ignored and belongs to the demo alone: each demo run replaces the previous recording, and `pnpm e2e` (which uses `apps/e2e/test-results/`) never touches it. Nothing touches the live site.
 
 In the recording, a brand signs up and creates a ₹6,000 campaign with three milestones; a creator opens it from **Live campaigns** and submits three post links; the brand reviews them; the simulated feed reports views; post A is paid ₹2,000 and then the ₹3,000 difference; posts B and C report views at the same moment with ₹1,000 left, and only one is paid; the campaign is exhausted, and the creator's earnings read ₹6,000 paid, ₹15,000 earned and ₹9,000 unfunded. Every step is asserted, so the run fails rather than record anything the app did not do. The video has captions, not a voice-over.
 

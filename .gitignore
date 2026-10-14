@@ -18,6 +18,8 @@ coverage/
 # Playwright: traces and reports from failed browser tests
 test-results/
 playwright-report/
+# Playwright: the recorded workflow demo (pnpm --filter e2e demo)
+demo-results/
 
 # environment files (only examples are committed)
 .env
