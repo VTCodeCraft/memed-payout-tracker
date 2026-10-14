@@ -36,6 +36,12 @@ const envSchema = z.object({
     .regex(DURATION, 'must be a positive duration such as 7d, 12h, 30m or 45s')
     .default('7d')
     .transform(durationToSeconds),
+  // Optional: without it the live campaign list is read from MongoDB on every request.
+  REDIS_URL: z
+    .string()
+    .trim()
+    .regex(/^rediss?:\/\/\S+$/, 'must be a redis:// or rediss:// URL')
+    .optional(),
 });
 
 export interface Env {
@@ -44,6 +50,8 @@ export interface Env {
   mongodbUri: string;
   corsOrigins: string[];
   jwt: JwtConfig;
+  /** Set to cache the live campaign list in Redis; unset to go without a cache. */
+  redisUrl: string | undefined;
 }
 
 /**
@@ -58,7 +66,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
     throw new Error(`Invalid environment configuration:\n${problems.join('\n')}`);
   }
 
-  const { NODE_ENV, PORT, MONGODB_URI, CORS_ORIGINS, JWT_SECRET, JWT_EXPIRES_IN } = result.data;
+  const { NODE_ENV, PORT, MONGODB_URI, CORS_ORIGINS, JWT_SECRET, JWT_EXPIRES_IN, REDIS_URL } = result.data;
 
   return {
     nodeEnv: NODE_ENV,
@@ -66,5 +74,6 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
     mongodbUri: MONGODB_URI,
     corsOrigins: parseCorsOrigins(CORS_ORIGINS, NODE_ENV),
     jwt: { secret: JWT_SECRET, expiresInSeconds: JWT_EXPIRES_IN },
+    redisUrl: REDIS_URL,
   };
 }

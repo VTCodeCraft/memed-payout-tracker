@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import mongoose from 'mongoose';
 import { createApp } from './app';
+import { createRedisStore } from './cache/redis-store';
 import { loadEnv } from './config/env';
 import { connectToDatabase } from './db/connection';
 import { createShutdown } from './shutdown';
@@ -18,6 +19,10 @@ async function main(): Promise<void> {
   await connectToDatabase(env.mongodbUri);
   console.log(`Connected to MongoDB database "${mongoose.connection.name}"`);
 
+  // Optional, and connected in the background: the API never waits for the cache.
+  const redis = env.redisUrl ? createRedisStore(env.redisUrl) : undefined;
+  console.log(redis ? 'Redis cache: enabled for the live campaign list' : 'Redis cache: disabled (REDIS_URL not set)');
+
   const server = createApp({ corsOrigins: env.corsOrigins, jwt: env.jwt }).listen(env.port, () => {
     console.log(`API listening on http://localhost:${env.port} (${env.nodeEnv})`);
     console.log(`CORS allowed origins: ${env.corsOrigins.join(', ')}`);
@@ -25,7 +30,10 @@ async function main(): Promise<void> {
 
   const shutdown = createShutdown({
     server,
-    closeResources: () => mongoose.disconnect(),
+    closeResources: async () => {
+      redis?.close();
+      await mongoose.disconnect();
+    },
     timeoutMs: SHUTDOWN_TIMEOUT_MS,
     exit: (code) => process.exit(code),
   });

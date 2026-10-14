@@ -120,4 +120,25 @@ describe('loadEnv', () => {
       );
     });
   });
+
+  describe('REDIS_URL', () => {
+    it('is optional: unset means no cache', () => {
+      expect(loadEnv(REQUIRED).redisUrl).toBeUndefined();
+    });
+
+    it.each(['redis://localhost:6379', 'rediss://default:p4ss@cache.example.com:6380'])('accepts %p', (url) => {
+      expect(loadEnv({ ...REQUIRED, REDIS_URL: url }).redisUrl).toBe(url);
+    });
+
+    it.each(['https://default:p4ss@cache.example.com', 'localhost:6379', 'redis://has space@host', ''])(
+      'rejects %p without echoing it',
+      (url) => {
+        const message = configError({ ...REQUIRED, REDIS_URL: url });
+
+        expect(message).toMatch(/REDIS_URL: must be a redis:\/\/ or rediss:\/\/ URL/);
+        if (url) expect(message).not.toContain(url);
+        expect(message).not.toContain('p4ss');
+      },
+    );
+  });
 });
