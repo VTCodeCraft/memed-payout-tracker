@@ -66,27 +66,4 @@ describe('Redis store when Redis cannot be reached', () => {
   });
 });
 
-// Needs a real Redis, which this machine does not run; Jest reports it as skipped unless
-// REDIS_TEST_URL points at one (planned with the Docker setup).
-const realRedis = process.env.REDIS_TEST_URL;
-(realRedis ? describe : describe.skip)('Redis store against a real Redis', () => {
-  it('sets with an expiry, gets and deletes', async () => {
-    const { store } = openStore(realRedis ?? '');
-    const key = `memed:test:${Date.now()}`;
-
-    // Commands reject until the background connection is ready, so retry the first one.
-    const deadline = Date.now() + 5_000;
-    for (;;) {
-      try {
-        await store.set(key, 'value', 60);
-        break;
-      } catch (error) {
-        if (Date.now() > deadline) throw error;
-        await sleep(100);
-      }
-    }
-    expect(await store.get(key)).toBe('value');
-    await store.del(key);
-    expect(await store.get(key)).toBeNull();
-  });
-});
+// The tests against a real Redis are in redis.real.test.ts.
