@@ -7,13 +7,25 @@ Brands run campaigns with a budget and a **milestone ladder** (for example 10,00
 
 The API runs on Render's free tier and sleeps when idle: the first request after a quiet spell can take up to a minute. Open the health check first before a demo.
 
-**Contents:** [Try it](#try-it) · [Features](#features) · [Architecture](#architecture) · [Run it locally](#run-it-locally) · [Tests](#tests-and-checks) · [API reference](#api-reference) · [Payout rules](#payout-rules) · [Decisions](#decisions-and-assumptions) · [Deployment](#deployment) · [Scaling and operations](#scaling-and-operations) · [Limitations](#limitations)
+**Contents:** [Try it](#try-it) · [Demo](#demo) · [Features](#features) · [Architecture](#architecture) · [Run it locally](#run-it-locally) · [Tests](#tests-and-checks) · [API reference](#api-reference) · [Payout rules](#payout-rules) · [Decisions](#decisions-and-assumptions) · [Deployment](#deployment) · [Scaling and operations](#scaling-and-operations) · [Limitations](#limitations)
 
 ## Try it
 
 1. Sign up as a **brand**, choose **Create campaign**, and give it a budget and a ladder.
 2. In another browser (or after logging out), sign up as a **creator**, open the campaign from **Live campaigns**, and submit a link to one Instagram post or reel, or a YouTube video, matching the campaign's platform.
 3. Views are simulated: there is no button for them. Report a view count with the [`PATCH` example below](#simulate-view-updates). The creator's **My earnings** page and the brand's campaign page then show what was earned, paid and left unfunded.
+
+## Demo
+
+A captioned recording of the whole workflow is made by a script, so it always shows the current app:
+
+```bash
+pnpm --filter e2e demo
+```
+
+It builds both apps, runs them on the browser tests' throwaway stack (ports 4100 and 3100, with an in-memory MongoDB that disappears afterwards), plays the workflow in Chromium, and writes a 1280×720 video of about 2½ minutes to `apps/e2e/test-results/demo/<test name>/video.webm`. The folder is git-ignored and replaced on every run; nothing touches the live site.
+
+In the recording, a brand signs up and creates a ₹6,000 campaign with three milestones; a creator opens it from **Live campaigns** and submits three post links; the brand reviews them; the simulated feed reports views; post A is paid ₹2,000 and then the ₹3,000 difference; posts B and C report views at the same moment with ₹1,000 left, and only one is paid; the campaign is exhausted, and the creator's earnings read ₹6,000 paid, ₹15,000 earned and ₹9,000 unfunded. Every step is asserted, so the run fails rather than record anything the app did not do. The video has captions, not a voice-over.
 
 ## Features
 
