@@ -21,6 +21,7 @@ The API runs on Render's free tier and sleeps when idle: the first request after
 - **Brands:** create Instagram or YouTube campaigns with a total budget and a ladder of 1–10 milestones; see each campaign's budget, spent and remaining, and every post submitted to it with its views, eligible payout and paid amount.
 - **Creators:** browse live campaigns; submit post links (the API normalises them, rejects other platforms and refuses the same post twice); see their posts and an earnings summary of paid, eligible and unfunded amounts.
 - **Payouts:** a simulated view-update endpoint; payouts by highest milestone reached; never paying the same milestone twice; partial payouts when the budget is short; campaigns marked exhausted when their budget reaches zero.
+- **View spikes:** an update that grows a post's views by 10,000 or more an hour is flagged on the submission for a person to review, without changing any payout (see [View-spike flag](#view-spike-flag)).
 - **Safety:** role checks on every endpoint, brands limited to their own campaigns, creators to their own submissions and earnings; payout updates are transactional and safe under concurrent requests (see [Architecture](#architecture)).
 
 ## Architecture
@@ -117,8 +118,8 @@ pnpm e2e         # browser tests (separate: needs a browser, takes about a minut
 
 | Layer | What it proves | Count |
 |---|---|---|
-| API unit (`apps/server/tests/unit`) | Payout engine, ladder rules, URL normalisation, validation schemas, env checks | 156 |
-| API integration (`apps/server/tests/integration`) | Every endpoint over HTTP against an in-memory MongoDB replica set: auth, roles, ownership, payouts, partial payouts, exhaustion, concurrency, the whole brand-to-creator workflow | 178 |
+| API unit (`apps/server/tests/unit`) | Payout engine, view-spike rule, ladder rules, URL normalisation, validation schemas, env checks | 172 |
+| API integration (`apps/server/tests/integration`) | Every endpoint over HTTP against an in-memory MongoDB replica set: auth, roles, ownership, payouts, partial payouts, exhaustion, view spikes, concurrency, the whole brand-to-creator workflow | 187 |
 | Frontend unit (`apps/frontend/src/**/*.test.ts`) | API client, session store, route decisions, form checks, formatting | 75 |
 | Frontend component (`apps/frontend/src/**/*.test.tsx`) | React pages rendered in happy-dom with `fetch` stubbed: loading, empty, error, retry, validation, duplicate submits | 52 |
 | Browser E2E (`apps/e2e/tests`) | Real Chromium against a production build and the real API on a throwaway database: the full workflow, route protection, reloads, expired sessions, cross-tab logout, isolation, network failures | 9 |
@@ -149,9 +150,9 @@ Base path `/api`. Send JSON with `Content-Type: application/json`; authenticated
 | `POST /submissions` | creator | `{ campaignId, postUrl }` | `201 { submission }` |
 | `GET /submissions/mine` | creator | | `200 { submissions }`, own posts, newest first |
 | `GET /submissions/earnings` | creator | | `200 { earnings: { totalPaid, totalEligible, totalUnfunded, submissionCount } }` |
-| `PATCH /submissions/:id/views` | anyone (simulated feed) | `{ views }` | `200 { submission, allocation, campaign }` |
+| `PATCH /submissions/:id/views` | anyone (simulated feed) | `{ views }` | `200 { submission, allocation, campaign, viewSpikeDetected }` |
 
-- `user`: `{ id, name, email, role, createdAt }`. `campaign`: `{ id, name, platform, totalBudget, spent, remaining, milestones, status, createdAt }` with `status` `live` or `exhausted`. `submission`: `{ id, campaignId, platform, postUrl, normalizedUrl, views, eligiblePayout, paidPayout, createdAt }`.
+- `user`: `{ id, name, email, role, createdAt }`. `campaign`: `{ id, name, platform, totalBudget, spent, remaining, milestones, status, createdAt }` with `status` `live` or `exhausted`. `submission`: `{ id, campaignId, platform, postUrl, normalizedUrl, views, eligiblePayout, paidPayout, viewSpike, createdAt }`, where `viewSpike` is `null` or `{ detectedAt, fromViews, toViews, viewsPerHour }` (see [View-spike flag](#view-spike-flag)).
 - Owner ids are never sent; ownership always comes from the token, and fields a client should not set (`brandId`, `spent`, `status`, payouts) are ignored.
 - Another brand's campaign answers `404`, exactly like a missing one.
 
@@ -192,11 +193,12 @@ The response reports what happened:
 {
   "submission": { "id": "<submission-id>", "views": 60000, "eligiblePayout": 2000, "paidPayout": 2000, "...": "..." },
   "allocation": { "grantedNow": 2000, "unfundedPayout": 0, "outcome": "paid" },
-  "campaign": { "remaining": 4000, "status": "live" }
+  "campaign": { "remaining": 4000, "status": "live" },
+  "viewSpikeDetected": true
 }
 ```
 
-`outcome` is `paid`, `partial` (the budget covered only part), `budget_exhausted` (nothing left to pay), `no_new_payout` (no new milestone reached) or `no_change` (same count as before; nothing written).
+`outcome` is `paid`, `partial` (the budget covered only part), `budget_exhausted` (nothing left to pay), `no_new_payout` (no new milestone reached) or `no_change` (same count as before; nothing written). `viewSpikeDetected` is `true` here because 60,000 views arrived within an hour of the post's last count; it does not change the payout.
 
 To get a submission id from the command line, sign in as the creator and list their posts:
 
@@ -225,7 +227,43 @@ curl -s "$API/api/submissions/mine" -H "Authorization: Bearer <creator-token>"  
 | Post B → 1,20,000 | ₹5,000 | ₹1,000 | ₹1,000 | ₹0, exhausted | `partial` (₹4,000 unfunded) |
 | Post B → 1,50,000 | ₹5,000 | ₹0 | ₹1,000 | ₹0 | `budget_exhausted` |
 
-The creator's earnings then read: paid ₹6,000, eligible ₹10,000, unfunded ₹4,000, 2 posts. The campaign has spent exactly its ₹6,000 budget.
+The creator's earnings then read: paid ₹6,000, eligible ₹10,000, unfunded ₹4,000, 2 posts. The campaign has spent exactly its ₹6,000 budget. Run in quick succession like this, every update except the repeat is also flagged as a view spike (below); none of the amounts change because of it.
+
+## View-spike flag
+
+The API flags a view update that grows a post's count unusually fast, as a signal for a person to review. It is not fraud detection: the app never sees real Instagram or YouTube data, only the counts reported to it, so a flag means those counts grew fast, not that the views are fake.
+
+**The rule.** An update is a spike when
+
+```
+views gained / max(hours since the previous count was recorded, 1) >= 10,000 views an hour
+```
+
+- The previous count is the post's last recorded view count; for its first update, that is 0 views at the moment it was submitted.
+- Time is floored at one hour, so reports seconds apart cannot turn a small gain into a huge rate: within an hour, only a gain of 10,000 views or more is flagged.
+- Milestones play no part. Ordinary growth that crosses a milestone is never flagged; a jump is flagged for its speed, whatever it pays.
+- Repeating the same count writes nothing, so it neither flags nor restarts the clock. A lower or invalid count is rejected before the rule runs.
+
+| Update | Gain | Since the previous count | Rate | Flagged |
+|---|---|---|---|---|
+| 0 → 60,000, minutes after submitting | 60,000 | 5 minutes (counted as 1 hour) | 60,000/h | yes |
+| 9,000 → 10,500, crossing the ₹500 milestone | 1,500 | 2 hours | 750/h | no |
+| 10,500 → 1,00,000 | 89,500 | 24 hours | 3,729/h | no |
+| 50,000 → 70,000 on a post submitted three days ago | 20,000 | 10 minutes (counted as 1 hour) | 20,000/h | yes |
+
+**Reading the flag.**
+
+- The view-update response's `viewSpikeDetected` says whether that update was a spike.
+- Every submission carries `viewSpike`: `null`, or the latest spike as `{ detectedAt, fromViews, toViews, viewsPerHour }`. It stays after later ordinary updates as evidence, so the brand's list of a campaign's submissions (`GET /campaigns/:id/submissions`) shows which posts to look at. Creators see it on their own posts too.
+- The flag never changes payouts: a flagged update earns and is paid exactly what an unflagged one would, within the same budget cap. Holding back or reversing a payment is left to a person.
+- It is computed inside the same transaction as the payout and saved by the same conditional write, so racing updates cannot record a spike against a count that was already replaced.
+
+**Limitations.**
+
+- One fixed threshold for every post. A very large account that grows steadily faster than 10,000 views an hour is flagged on every report, and a small account's unusual jump below it is not. Comparing a post with its own earlier growth would adapt, at the cost of storing more history.
+- It is only as precise as the feed's reporting: a burst between two reports a day apart is averaged over the day.
+- Only the latest spike is kept, with no reviewed or dismissed state, and the web app does not show it yet.
+- Creators can read the rule and their own flags; a real anti-fraud signal might be kept from them.
 
 ## Decisions and assumptions
 
@@ -257,4 +295,4 @@ These settings live in the Vercel and Render dashboards, not in the repository. 
 - **Earnings page requests:** submissions carry only a campaign id, so the creator's earnings page fetches each distinct campaign once to show its name.
 - **Tests:** browser tests run locally with Chromium only; there is no CI. Production checks are manual.
 - **Database user:** development and production use one Atlas user with access to both databases; separate users per environment would be safer.
-- **Optional items from the brief that are not implemented:** caching the campaign list in Redis, flagging unusual view spikes, Docker, and a scaling note. Concurrent payout safety, also optional, is implemented and tested.
+- **Optional items from the brief that are not implemented:** caching the campaign list in Redis, Docker, and a scaling note. Two optional items are implemented and tested: concurrent payout safety and view-spike flagging (with the limitations listed in [View-spike flag](#view-spike-flag)).
