@@ -7,7 +7,7 @@ Brands run campaigns with a budget and a **milestone ladder** (for example 10,00
 
 The API runs on Render's free tier and sleeps when idle: the first request after a quiet spell can take up to a minute. Open the health check first before a demo.
 
-**Contents:** [Try it](#try-it) · [Features](#features) · [Architecture](#architecture) · [Run it locally](#run-it-locally) · [Tests](#tests-and-checks) · [API reference](#api-reference) · [Payout rules](#payout-rules) · [Decisions](#decisions-and-assumptions) · [Deployment](#deployment) · [Limitations](#limitations)
+**Contents:** [Try it](#try-it) · [Features](#features) · [Architecture](#architecture) · [Run it locally](#run-it-locally) · [Tests](#tests-and-checks) · [API reference](#api-reference) · [Payout rules](#payout-rules) · [Decisions](#decisions-and-assumptions) · [Deployment](#deployment) · [Scaling and operations](#scaling-and-operations) · [Limitations](#limitations)
 
 ## Try it
 
@@ -336,6 +336,35 @@ Optional, and off in production. With `REDIS_URL` set, the creators' live campai
 
 These settings live in the Vercel and Render dashboards, not in the repository. Both services deploy from `main`. No Redis is provisioned: `REDIS_URL` is unset on Render, so production reads the live campaign list from MongoDB.
 
+## Scaling and operations
+
+### Scaling to 10,000 creators
+
+Production runs one API instance. What already holds with several:
+
+- **Budgets cannot be overspent.** The guarantee is enforced by MongoDB, not by process memory: each paying view update is a transaction whose writes are conditional on the values it read ([Architecture](#architecture)), so two instances racing for a campaign's last rupees behave like two requests to one instance.
+- **Any instance can answer any request.** The JWT is verified on every request and no session state lives on the server. The web app on Vercel scales on its own.
+- **The live-list cache is shared.** With Redis on, all instances read and invalidate the same key; a lost invalidation is still bounded by the 60-second expiry, and an outage falls back to MongoDB ([Live campaign cache](#live-campaign-cache-redis)).
+
+What must change first, roughly in this order:
+
+1. **Rate limits** are counted in each process's memory, so N instances allow N times the limit and a restart resets it. They need a shared store (Redis is already in the stack). They key on Cloudflare's `CF-Connecting-IP`, which Render provides; behind another proxy the client key needs revisiting.
+2. **Connections:** each API process may open up to 100 MongoDB connections (the driver's default; this code sets no pool size). Set `maxPoolSize` so that instances × pool size stays within the cluster's connection limit.
+3. **Pagination:** `/campaigns/mine`, `/campaigns/live`, `/submissions/mine` and a campaign's submissions return every record. Cursor pagination can use the existing `createdAt` indexes; earnings totals are already one indexed aggregation.
+4. **The view feed:** the brief's endpoint is public and limited to 120 updates a minute per client, which a single real platform feed would exceed. A real feed would be an authenticated, batched ingestion path or a queue.
+5. **Busy campaigns:** every paying update for a campaign writes that campaign's `spent`, so concurrent updates for one popular campaign conflict and retry, and after 3 attempts the API answers `409 CONCURRENT_UPDATE` for the feed to retry. If that becomes common, one queue consumer per campaign would serialise them.
+
+For scale, assuming 5 live posts per creator updated hourly, 10,000 creators produce about 50,000 view updates an hour, or 14 a second, each a small transaction. That is modest for one MongoDB replica set; the changes above are about per-process limits and contention, not raw volume.
+
+### Operations
+
+- **Health check:** `GET /api/health` reports the database connection from the driver's state, without querying on every probe, and answers `503` when disconnected. Docker Compose uses it; Redis is deliberately left out of it.
+- **Shutdown:** on `SIGTERM` (Render sends it on every deploy) or `SIGINT`, the API stops accepting connections, lets in-flight requests finish, closes Redis and MongoDB, and exits; anything still running after 10 seconds makes it exit with an error.
+- **Configuration and secrets:** environment variables are validated at startup and their values never printed. Secrets live in the Render and Vercel dashboards and in git-ignored `.env` files. Changing `JWT_SECRET` signs everyone out, because existing tokens stop verifying.
+- **Logs** go to stdout and stderr only: startup, cache outages, shutdown, and unexpected errors with their stack. They are read in the hosting dashboards; there is no request logging, metrics, tracing or alerting.
+- **Backups:** this project sets none up; they depend on the MongoDB Atlas plan.
+- **Deploys:** pushing to `main` deploys both services. There is no CI or staging environment; the checks in [Tests and checks](#tests-and-checks) are run locally before pushing.
+
 ## Limitations
 
 - **Views are simulated.** There is no UI to report views and no integration with Instagram or YouTube; submitted posts are not checked to exist. Anyone can call the view-update endpoint (per the brief); it is only rate-limited.
@@ -346,4 +375,4 @@ These settings live in the Vercel and Render dashboards, not in the repository. 
 - **Earnings page requests:** submissions carry only a campaign id, so the creator's earnings page fetches each distinct campaign once to show its name.
 - **Tests:** browser tests run locally with Chromium only; there is no CI. Production checks are manual.
 - **Database user:** development and production use one Atlas user with access to both databases; separate users per environment would be safer.
-- **Optional items from the brief that are not implemented:** a scaling note. Implemented and tested: concurrent payout safety, view-spike flagging (with the limitations listed in [View-spike flag](#view-spike-flag)), Redis caching of the live campaign list (tested against a real Redis locally, not deployed; see [Live campaign cache](#live-campaign-cache-redis)), and Docker for local runs (see [Docker](#docker); production does not use it).
+- **Optional items from the brief:** all are covered. The scaling note is [Scaling and operations](#scaling-and-operations). Implemented and tested: concurrent payout safety, view-spike flagging (with the limitations listed in [View-spike flag](#view-spike-flag)), Redis caching of the live campaign list (tested against a real Redis locally, not deployed; see [Live campaign cache](#live-campaign-cache-redis)), and Docker for local runs (see [Docker](#docker); production does not use it).
