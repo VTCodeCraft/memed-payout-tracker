@@ -30,12 +30,11 @@ describe('Redis store when Redis cannot be reached', () => {
   it('keeps the process running, rejects commands at once, logs the outage once, and stops cleanly', async () => {
     const { store, log } = openStore(UNREACHABLE);
 
-    // Commands are not queued behind the connection attempt.
-    const started = Date.now();
-    await expect(store.get('key')).rejects.toThrow();
-    await expect(store.set('key', 'value', 60)).rejects.toThrow();
-    await expect(store.del('key')).rejects.toThrow();
-    expect(Date.now() - started).toBeLessThan(100);
+    // Commands are rejected as offline at once, not queued behind the connection attempt
+    // (a queued command would wait until Redis came back).
+    await expect(store.get('key')).rejects.toThrow('The client is offline');
+    await expect(store.set('key', 'value', 60)).rejects.toThrow('The client is offline');
+    await expect(store.del('key')).rejects.toThrow('The client is offline');
 
     // Refused connections are reported once, however many retries follow.
     await waitFor(() => log.warn.mock.calls.length > 0, 10_000);
@@ -47,20 +46,23 @@ describe('Redis store when Redis cannot be reached', () => {
 
     store.close();
     store.close(); // shutdown may run it twice; it must not throw
-    await expect(store.get('key')).rejects.toThrow();
+    await expect(store.get('key')).rejects.toThrow('The client is closed');
     await sleep(1_000); // no reconnect attempts, and so no more logging, after closing
     expect(log.warn).toHaveBeenCalledTimes(1);
   }, 20_000);
 
-  it('lets the cache fall back well within its timeout', async () => {
+  it('lets the cache fall back at once rather than waiting out its timeout', async () => {
     const { store } = openStore(UNREACHABLE);
-    const cache = createLiveCampaignsCache(store, { report: jest.fn() });
+    const report = jest.fn();
+    const cache = createLiveCampaignsCache(store, { report });
 
-    const started = Date.now();
     expect(await cache.read()).toBeUndefined();
     await cache.write([]);
     await cache.invalidate();
-    expect(Date.now() - started).toBeLessThan(250);
+
+    // Reported once, and as offline: the 250 ms timeout never had to run out.
+    expect(report).toHaveBeenCalledTimes(1);
+    expect(report).toHaveBeenCalledWith(expect.stringContaining('The client is offline'));
   });
 });
 
