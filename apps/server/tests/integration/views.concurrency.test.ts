@@ -70,6 +70,32 @@ describe('PATCH /api/submissions/:id/views under concurrency', () => {
     await expectPayoutInvariants(campaignId);
   });
 
+  it('records each spike against the count it actually replaced when updates race', async () => {
+    const campaignId = await campaign(6_000, [
+      { views: 10_000, payout: 500 },
+      { views: 50_000, payout: 2_000 },
+    ]);
+    const [id] = await submissions(campaignId, 1);
+    const counts = Array.from({ length: 10 }, (_, i) => (i + 1) * 10_000);
+
+    const responses = await Promise.all(counts.map((views) => setViews(id!, views)));
+
+    // Applied updates must have run in increasing order (a lower count is rejected), and
+    // every gain is 10,000+ within the hour, so each one is a spike from the count before.
+    const applied = responses.filter((res) => res.status === 200).map((res) => res.body.submission.views).sort((a, b) => a - b);
+    for (const res of responses.filter((r) => r.status === 200)) {
+      const previous = applied[applied.indexOf(res.body.submission.views) - 1] ?? 0;
+      expect(res.body).toMatchObject({ viewSpikeDetected: true });
+      expect(res.body.submission.viewSpike).toMatchObject({ fromViews: previous, toViews: res.body.submission.views });
+    }
+    for (const res of responses.filter((r) => r.status !== 200)) {
+      expect(['VIEWS_DECREASED', 'CONCURRENT_UPDATE']).toContain(res.body.error.code);
+    }
+    const stored = await Submission.findById(id).lean();
+    expect(stored).toMatchObject({ views: applied.at(-1), viewSpike: { fromViews: applied.at(-2) ?? 0, toViews: applied.at(-1) } });
+    await expectPayoutInvariants(campaignId);
+  });
+
   it('never overspends when many submissions draw on the same budget at once', async () => {
     const campaignId = await campaign(2_500, [
       { views: 10_000, payout: 500 },
