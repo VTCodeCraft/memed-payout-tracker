@@ -138,6 +138,18 @@ describe('live campaigns cache', () => {
     ['a campaign that is not live', JSON.stringify([{ ...campaign, status: 'exhausted' }])],
     ['a campaign with a mistyped figure', JSON.stringify([{ ...campaign, spent: '500' }])],
     ['a campaign missing a field', JSON.stringify([{ ...campaign, remaining: undefined }])],
+    // Well-typed, but nothing the API could have sent:
+    ['an id that is not an ObjectId', JSON.stringify([{ ...campaign, id: '../../admin' }])],
+    ['an empty name', JSON.stringify([{ ...campaign, name: '' }])],
+    ['a name longer than 80 characters', JSON.stringify([{ ...campaign, name: 'x'.repeat(81) }])],
+    ['negative spend', JSON.stringify([{ ...campaign, spent: -500, remaining: 6_500 }])],
+    ['spend above the budget', JSON.stringify([{ ...campaign, spent: 7_000, remaining: -1_000 }])],
+    ['a remaining figure that disagrees with the budget', JSON.stringify([{ ...campaign, remaining: 6_000 }])],
+    ['fractional rupees', JSON.stringify([{ ...campaign, totalBudget: 6_000.5, remaining: 5_500.5 }])],
+    ['an empty milestone ladder', JSON.stringify([{ ...campaign, milestones: [] }])],
+    ['a ladder whose payouts do not increase', JSON.stringify([{ ...campaign, milestones: [{ views: 10_000, payout: 500 }, { views: 50_000, payout: 500 }] }])],
+    ['a milestone paying more than the budget', JSON.stringify([{ ...campaign, milestones: [{ views: 10_000, payout: 7_000 }] }])],
+    ['a creation date that is not a date', JSON.stringify([{ ...campaign, createdAt: 'yesterday' }])],
   ])('ignores %s instead of serving it', async (_label, raw) => {
     const report = jest.fn();
     const { store, data } = memoryStore();

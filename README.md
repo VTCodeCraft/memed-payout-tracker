@@ -122,7 +122,7 @@ pnpm e2e         # browser tests (separate: needs a browser, takes about a minut
 
 | Layer | What it proves | Count |
 |---|---|---|
-| API unit (`apps/server/tests/unit`) | Payout engine, view-spike rule, cache fail-open rules (timeouts, rejections, malformed data), ladder rules, URL normalisation, validation schemas, env checks | 194 |
+| API unit (`apps/server/tests/unit`) | Payout engine, view-spike rule, cache fail-open rules (timeouts, rejections, malformed data), ladder rules, URL normalisation, validation schemas, env checks | 205 |
 | API integration (`apps/server/tests/integration`) | Every endpoint over HTTP against an in-memory MongoDB replica set: auth, roles, ownership, payouts, partial payouts, exhaustion, view spikes, the live-list cache (invalidation, fallback), concurrency, the whole brand-to-creator workflow; the Redis client against an unreachable server | 198, plus 1 skipped (needs a real Redis) |
 | Frontend unit (`apps/frontend/src/**/*.test.ts`) | API client, session store, route decisions, form checks, formatting | 75 |
 | Frontend component (`apps/frontend/src/**/*.test.tsx`) | React pages rendered in happy-dom with `fetch` stubbed: loading, empty, error, retry, validation, duplicate submits | 52 |
@@ -273,7 +273,7 @@ views gained / max(hours since the previous count was recorded, 1) >= 10,000 vie
 
 Optional, and off in production. With `REDIS_URL` set, the creators' live campaign list (`GET /api/campaigns/live`) is cached in Redis. It is the only cached response: it is the same for every creator, and it is discovery data, so a short delay before it changes is acceptable. MongoDB stays the source of truth for everything else.
 
-- **Read-through:** the token and creator role are checked first; then the list comes from the cache, or on a miss from MongoDB, and is stored for **60 seconds** under the key `memed:campaigns:live:v1`. Cached entries are validated before use, so the response has exactly the same shape either way.
+- **Read-through:** the token and creator role are checked first; then the list comes from the cache, or on a miss from MongoDB, and is stored for **60 seconds** under the key `memed:campaigns:live:v1`. Cached entries are checked against the same rules as the API's own responses (exact fields, an ObjectId, whole rupees with `remaining = totalBudget - spent`, a valid ladder, `live` status), and anything else is treated as a miss, so only data the API itself could have sent is served.
 - **Invalidation:** creating a campaign, and any view update that pays (after its transaction has committed), delete the cached list, so the next request rebuilds it with the new spend and without campaigns that have run out.
 - **Never cached:** submitting a post (the campaign's status is re-read from MongoDB), payouts and budgets (the view-update transaction), a campaign's own page, brand pages, submissions and earnings. Cached figures never decide money or access.
 - **When Redis is down or slow:** every cache command is bounded by 250 ms and fails open: an error, a timeout or malformed cached data counts as a miss, and the list is read from MongoDB. While Redis is disconnected, commands fail at once instead of queueing; the client reconnects in the background (backoff capped at 5 seconds), the API never waits for it at startup, and an outage is logged once, without the URL.

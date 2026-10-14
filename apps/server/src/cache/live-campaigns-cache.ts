@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { type CampaignResponse, PLATFORMS } from '../models/campaign.model';
+import { type CampaignResponse, MAX_RUPEES, PLATFORMS, milestoneLadderProblem } from '../models/campaign.model';
 
 // A read-through cache for the creators' live campaign list: discovery data only. Nothing
 // that decides a payout, a budget, a submission or ownership ever reads it; those read
@@ -32,20 +32,26 @@ export const noLiveCampaignsCache: LiveCampaignsCache = {
   invalidate: async () => {},
 };
 
-// The cache lives outside this process, so what it returns is checked like any other input.
-// Strict objects reject extra fields, so a tampered entry cannot add an owner id to the response.
+// The cache lives outside this process, so what it returns is checked like any other input:
+// only data the API itself could have sent is served. Strict objects reject extra fields, so
+// a tampered entry cannot add an owner id; the refinements hold the same invariants as
+// toCampaignResponse and the campaign model.
+const rupees = z.number().int().min(0).max(MAX_RUPEES);
 const cachedCampaignsSchema = z.array(
-  z.strictObject({
-    id: z.string(),
-    name: z.string(),
-    platform: z.enum(PLATFORMS),
-    totalBudget: z.number().int(),
-    spent: z.number().int(),
-    remaining: z.number().int(),
-    milestones: z.array(z.strictObject({ views: z.number().int(), payout: z.number().int() })),
-    status: z.literal('live'),
-    createdAt: z.string(),
-  }),
+  z
+    .strictObject({
+      id: z.string().regex(/^[a-f\d]{24}$/), // a MongoDB ObjectId, as the API sends it
+      name: z.string().min(1).max(80),
+      platform: z.enum(PLATFORMS),
+      totalBudget: rupees.min(1),
+      spent: rupees,
+      remaining: rupees,
+      milestones: z.array(z.strictObject({ views: z.number().int().min(1), payout: rupees.min(1) })),
+      status: z.literal('live'),
+      createdAt: z.iso.datetime(),
+    })
+    .refine((campaign) => campaign.remaining === campaign.totalBudget - campaign.spent, 'remaining must equal totalBudget - spent')
+    .refine((campaign) => milestoneLadderProblem(campaign.milestones, campaign.totalBudget) === undefined, 'invalid milestone ladder'),
 );
 
 class CacheTimeoutError extends Error {
