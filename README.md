@@ -22,6 +22,7 @@ The API runs on Render's free tier and sleeps when idle: the first request after
 - **Creators:** browse live campaigns; submit post links (the API normalises them, rejects other platforms and refuses the same post twice); see their posts and an earnings summary of paid, eligible and unfunded amounts.
 - **Payouts:** a simulated view-update endpoint; payouts by highest milestone reached; never paying the same milestone twice; partial payouts when the budget is short; campaigns marked exhausted when their budget reaches zero.
 - **View spikes:** an update that grows a post's views by 10,000 or more an hour is flagged on the submission for a person to review, without changing any payout (see [View-spike flag](#view-spike-flag)).
+- **Live list cache (optional):** with `REDIS_URL` set, the creators' live campaign list is cached in Redis for up to 60 seconds; without it, as in production, every request reads MongoDB (see [Live campaign cache](#live-campaign-cache-redis)).
 - **Safety:** role checks on every endpoint, brands limited to their own campaigns, creators to their own submissions and earnings; payout updates are transactional and safe under concurrent requests (see [Architecture](#architecture)).
 
 ## Architecture
@@ -32,6 +33,7 @@ flowchart LR
   Feed["Simulated view feed<br/>(curl)"] -- "PATCH /submissions/:id/views" --> API
   API --> Engine["Payout engine<br/>eligiblePayout · allocatePayout"]
   API -- "Mongoose; view updates<br/>in a transaction" --> DB[("MongoDB Atlas<br/>replica set")]
+  API -- "live list only,<br/>optional" --> Cache[("Redis cache<br/>(off in production)")]
   E2E["Browser E2E<br/>Playwright"] -. "built app + real API" .-> UI
   Comp["Component tests<br/>happy-dom"] -. "pages, fetch stubbed" .-> UI
   Integ["API integration<br/>supertest + in-memory MongoDB"] -.-> API
@@ -43,6 +45,7 @@ flowchart LR
 | Frontend | Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS 4 |
 | API | Node.js 22, Express 5, TypeScript, zod validation |
 | Database | MongoDB (Atlas in production) with Mongoose 9 |
+| Cache | Optional Redis through `@redis/client`, for the live campaign list only; not used in production |
 | Auth | JWT (HS256) in a Bearer header; bcrypt password hashes |
 | Tests | Jest + supertest + mongodb-memory-server (API); `node --test` + happy-dom (frontend); Playwright (browser) |
 | Tooling | pnpm workspaces, Turborepo |
@@ -94,6 +97,7 @@ Copy `apps/server/.env.example` to `apps/server/.env` (the server reads it at st
 | `PORT` | server | no | Default `4000` |
 | `NODE_ENV` | server | no | `development` (default), `test` or `production` |
 | `CORS_ORIGINS` | server | in production | Comma-separated browser origins; in development defaults to `http://localhost:3000,http://localhost:3001` |
+| `REDIS_URL` | server | no | `redis://` or `rediss://` URL to cache the live campaign list; leave unset for no cache (production leaves it unset) |
 | `NEXT_PUBLIC_API_URL` | frontend | no locally | API origin, default `http://localhost:4000`; inlined at build time, so rebuild after changing it |
 
 The server validates these at startup and refuses to start with a clear message (naming the variable, never echoing its value). The tests need no environment variables.
@@ -118,8 +122,8 @@ pnpm e2e         # browser tests (separate: needs a browser, takes about a minut
 
 | Layer | What it proves | Count |
 |---|---|---|
-| API unit (`apps/server/tests/unit`) | Payout engine, view-spike rule, ladder rules, URL normalisation, validation schemas, env checks | 172 |
-| API integration (`apps/server/tests/integration`) | Every endpoint over HTTP against an in-memory MongoDB replica set: auth, roles, ownership, payouts, partial payouts, exhaustion, view spikes, concurrency, the whole brand-to-creator workflow | 187 |
+| API unit (`apps/server/tests/unit`) | Payout engine, view-spike rule, cache fail-open rules (timeouts, rejections, malformed data), ladder rules, URL normalisation, validation schemas, env checks | 194 |
+| API integration (`apps/server/tests/integration`) | Every endpoint over HTTP against an in-memory MongoDB replica set: auth, roles, ownership, payouts, partial payouts, exhaustion, view spikes, the live-list cache (invalidation, fallback), concurrency, the whole brand-to-creator workflow; the Redis client against an unreachable server | 198, plus 1 skipped (needs a real Redis) |
 | Frontend unit (`apps/frontend/src/**/*.test.ts`) | API client, session store, route decisions, form checks, formatting | 75 |
 | Frontend component (`apps/frontend/src/**/*.test.tsx`) | React pages rendered in happy-dom with `fetch` stubbed: loading, empty, error, retry, validation, duplicate submits | 52 |
 | Browser E2E (`apps/e2e/tests`) | Real Chromium against a production build and the real API on a throwaway database: the full workflow, route protection, reloads, expired sessions, cross-tab logout, isolation, network failures | 9 |
@@ -144,7 +148,7 @@ Base path `/api`. Send JSON with `Content-Type: application/json`; authenticated
 | `GET /auth/me` | signed in | | `200 { user }` |
 | `POST /campaigns` | brand | `{ name, platform, totalBudget, milestones: [{ views, payout }] }` | `201 { campaign }` |
 | `GET /campaigns/mine` | brand | | `200 { campaigns }`, own campaigns, newest first |
-| `GET /campaigns/live` | creator | | `200 { campaigns }`, every live campaign, newest first |
+| `GET /campaigns/live` | creator | | `200 { campaigns }`, every live campaign, newest first (up to 60 s stale when the [cache](#live-campaign-cache-redis) is on) |
 | `GET /campaigns/:id` | brand (own) or creator | | `200 { campaign }` |
 | `GET /campaigns/:id/submissions` | brand (own) | | `200 { submissions }` |
 | `POST /submissions` | creator | `{ campaignId, postUrl }` | `201 { submission }` |
@@ -265,6 +269,19 @@ views gained / max(hours since the previous count was recorded, 1) >= 10,000 vie
 - Only the latest spike is kept, with no reviewed or dismissed state, and the web app does not show it yet.
 - Creators can read the rule and their own flags; a real anti-fraud signal might be kept from them.
 
+## Live campaign cache (Redis)
+
+Optional, and off in production. With `REDIS_URL` set, the creators' live campaign list (`GET /api/campaigns/live`) is cached in Redis. It is the only cached response: it is the same for every creator, and it is discovery data, so a short delay before it changes is acceptable. MongoDB stays the source of truth for everything else.
+
+- **Read-through:** the token and creator role are checked first; then the list comes from the cache, or on a miss from MongoDB, and is stored for **60 seconds** under the key `memed:campaigns:live:v1`. Cached entries are validated before use, so the response has exactly the same shape either way.
+- **Invalidation:** creating a campaign, and any view update that pays (after its transaction has committed), delete the cached list, so the next request rebuilds it with the new spend and without campaigns that have run out.
+- **Never cached:** submitting a post (the campaign's status is re-read from MongoDB), payouts and budgets (the view-update transaction), a campaign's own page, brand pages, submissions and earnings. Cached figures never decide money or access.
+- **When Redis is down or slow:** every cache command is bounded by 250 ms and fails open: an error, a timeout or malformed cached data counts as a miss, and the list is read from MongoDB. While Redis is disconnected, commands fail at once instead of queueing; the client reconnects in the background (backoff capped at 5 seconds), the API never waits for it at startup, and an outage is logged once, without the URL.
+
+**How stale can the list be?** Normally not at all, because changes delete it. Two cases can leave it stale for up to 60 seconds: a read that began before a payment committed stores the older figures just after the delete, or a delete is lost because Redis was unreachable at that moment. The worst effect is a card showing an old spend, or an exhausted campaign still listed; opening it reads MongoDB, and submitting a post to it is refused (`409 CAMPAIGN_NOT_LIVE`).
+
+**Testing and status.** Unit tests cover the 250 ms bound (with a store that never answers), rejections, malformed data and log volume; integration tests check invalidation, fallback, the auth check before the cache, and that submissions and payouts ignore cached figures; the real Redis client is run against an unreachable server. **It has not been run against a real Redis server yet:** that test needs `REDIS_TEST_URL` and is skipped until the Docker setup provides one. To try the cache locally, run any Redis and set `REDIS_URL=redis://localhost:6379` in `apps/server/.env`.
+
 ## Decisions and assumptions
 
 - **One update crossing several milestones** pays only the highest one reached, minus anything already paid.
@@ -283,7 +300,7 @@ views gained / max(hours since the previous count was recorded, 1) >= 10,000 vie
 | API | Render web service | Build `npx --yes pnpm@10.34.6 install --frozen-lockfile && npx --yes pnpm@10.34.6 --filter server build`; start `node apps/server/dist/index.js`; env `NODE_ENV=production`, `MONGODB_URI` (database `memed_prod`), `JWT_SECRET`, `CORS_ORIGINS` = the Vercel origin |
 | Database | MongoDB Atlas | Replica set; IP allowlist for Render |
 
-These settings live in the Vercel and Render dashboards, not in the repository. Both services deploy from `main`.
+These settings live in the Vercel and Render dashboards, not in the repository. Both services deploy from `main`. No Redis is provisioned: `REDIS_URL` is unset on Render, so production reads the live campaign list from MongoDB.
 
 ## Limitations
 
@@ -295,4 +312,4 @@ These settings live in the Vercel and Render dashboards, not in the repository. 
 - **Earnings page requests:** submissions carry only a campaign id, so the creator's earnings page fetches each distinct campaign once to show its name.
 - **Tests:** browser tests run locally with Chromium only; there is no CI. Production checks are manual.
 - **Database user:** development and production use one Atlas user with access to both databases; separate users per environment would be safer.
-- **Optional items from the brief that are not implemented:** caching the campaign list in Redis, Docker, and a scaling note. Two optional items are implemented and tested: concurrent payout safety and view-spike flagging (with the limitations listed in [View-spike flag](#view-spike-flag)).
+- **Optional items from the brief that are not implemented:** Docker and a scaling note. Implemented and tested: concurrent payout safety, view-spike flagging (with the limitations listed in [View-spike flag](#view-spike-flag)), and Redis caching of the live campaign list (not deployed, and not yet run against a real Redis server; see [Live campaign cache](#live-campaign-cache-redis)).
