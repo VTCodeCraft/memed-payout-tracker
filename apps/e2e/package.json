@@ -10,7 +10,8 @@
   "scripts": {
     "e2e": "playwright test",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "demo": "playwright test --config playwright.demo.config.ts"
   },
   "devDependencies": {
     "@eslint/js": "9.39.5",
