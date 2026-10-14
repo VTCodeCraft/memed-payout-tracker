@@ -1,0 +1,24 @@
+# Keeps Docker build contexts small and free of local state and secrets.
+
+# dependencies and build output (each image installs and builds its own)
+**/node_modules
+**/dist
+**/.next
+**/.turbo
+**/*.tsbuildinfo
+**/next-env.d.ts
+
+# environment files: real values never enter an image (examples are documentation)
+**/.env
+**/.env.*
+!**/.env.example
+
+# tests, tooling and editor state
+**/coverage
+**/test-results
+**/playwright-report
+.git
+.claude
+.vscode
+.idea
+**/*.log
