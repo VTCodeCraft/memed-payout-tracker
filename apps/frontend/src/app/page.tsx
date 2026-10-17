@@ -2,6 +2,7 @@ import { AppShell } from "@/components/app-shell";
 import { Badge } from "@/components/badge";
 import { BudgetSummary } from "@/components/budget-summary";
 import { Card } from "@/components/card";
+import { LandingSection } from "@/components/landing-section";
 import { MilestoneList } from "@/components/milestone-list";
 import { PublicHeaderActions } from "@/components/public-header-actions";
 import { StartLinks } from "@/components/start-links";
@@ -75,17 +76,7 @@ export default function Home() {
         </figure>
       </section>
 
-      <section
-        id="how-payouts-work"
-        aria-labelledby="how-payouts-work-title"
-        className="mt-12 grid scroll-mt-8 gap-8 border-t border-ink pt-10 md:mt-20 md:pt-12 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] md:gap-16"
-      >
-        <div>
-          <h2 id="how-payouts-work-title" className="text-2xl font-semibold tracking-tight md:text-3xl">
-            How payouts work
-          </h2>
-          <p className="mt-3 max-w-xs text-muted text-pretty">The same three rules apply to every campaign.</p>
-        </div>
+      <LandingSection id="how-payouts-work" title="How payouts work" intro="The same three rules apply to every campaign.">
         <ol className="divide-y divide-ink/10">
           {STEPS.map(({ title, body }, index) => (
             <li key={title} className="grid grid-cols-[2.5rem_minmax(0,1fr)] gap-x-4 py-6 first:pt-0 last:pb-0">
@@ -97,7 +88,7 @@ export default function Home() {
             </li>
           ))}
         </ol>
-      </section>
+      </LandingSection>
     </AppShell>
   );
 }
