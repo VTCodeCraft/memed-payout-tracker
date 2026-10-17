@@ -36,3 +36,11 @@ export function spentPercent({ spent, totalBudget }: Pick<Campaign, "spent" | "t
 export function highestMilestone(views: number, milestones: Milestone[]): number {
   return milestones.filter((milestone) => views >= milestone.views).length;
 }
+
+/**
+ * What `views` earn on the ladder: the payout of the highest milestone reached, or 0 below
+ * the first. Tiers replace each other and never add up, as in the API's eligiblePayout.
+ */
+export function eligiblePayout(views: number, milestones: Milestone[]): number {
+  return milestones[highestMilestone(views, milestones) - 1]?.payout ?? 0;
+}
