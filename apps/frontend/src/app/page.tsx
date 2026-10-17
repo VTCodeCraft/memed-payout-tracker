@@ -5,6 +5,7 @@ import { Card } from "@/components/card";
 import { Faq } from "@/components/faq";
 import { ForBrandsAndCreators } from "@/components/for-brands-and-creators";
 import { Guarantees } from "@/components/guarantees";
+import { LandingFooter } from "@/components/landing-footer";
 import { LandingSection } from "@/components/landing-section";
 import { MilestoneList } from "@/components/milestone-list";
 import { PayoutCalculator } from "@/components/payout-calculator";
@@ -34,7 +35,7 @@ const STEPS = [
 
 export default function Home() {
   return (
-    <AppShell actions={<PublicHeaderActions />}>
+    <AppShell actions={<PublicHeaderActions />} footer={<LandingFooter />}>
       <section className="grid items-center gap-12 py-4 md:py-10 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:gap-16">
         <div>
           <p className="text-sm font-medium lowercase text-muted">meme&apos;d · campaign payout tracker</p>
@@ -100,6 +101,16 @@ export default function Home() {
       <Guarantees />
 
       <Faq />
+
+      <section
+        aria-labelledby="start-title"
+        className="mt-12 flex flex-col gap-8 border-t border-ink pt-10 md:mt-20 md:pt-12 lg:flex-row lg:items-end lg:justify-between"
+      >
+        <h2 id="start-title" className="max-w-2xl text-3xl font-semibold tracking-tight text-balance md:text-5xl">
+          Start a campaign, or find one to post for.
+        </h2>
+        <StartLinks />
+      </section>
     </AppShell>
   );
 }

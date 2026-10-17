@@ -6,6 +6,8 @@ interface AppShellProps {
   nav?: ReactNode;
   /** Right-hand header content, such as the signed-in user and sign-out. */
   actions?: ReactNode;
+  /** Page footer content, rendered after <main> so it is the page's contentinfo landmark. */
+  footer?: ReactNode;
   children: ReactNode;
 }
 
@@ -14,7 +16,7 @@ interface AppShellProps {
  * page content. Each role has two or three destinations, so a top bar fits them; on
  * small screens the navigation wraps onto its own row instead of hiding in a menu.
  */
-export function AppShell({ nav, actions, children }: AppShellProps) {
+export function AppShell({ nav, actions, footer, children }: AppShellProps) {
   return (
     <>
       <a
@@ -40,6 +42,11 @@ export function AppShell({ nav, actions, children }: AppShellProps) {
       <main id="main" className="mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 py-8 md:px-8 md:py-12">
         {children}
       </main>
+      {footer && (
+        <footer className="border-t border-ink">
+          <div className="mx-auto w-full max-w-7xl px-4 py-8 md:px-8">{footer}</div>
+        </footer>
+      )}
     </>
   );
 }
