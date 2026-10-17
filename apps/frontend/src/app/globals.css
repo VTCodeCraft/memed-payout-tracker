@@ -28,6 +28,14 @@
     color-scheme: light;
   }
 
+  /* Glide to in-page anchors, unless the visitor asks for less motion. layout.tsx sets
+     data-scroll-behavior so Next.js still jumps instantly between pages. */
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
+  }
+
   body {
     background: var(--color-white);
     color: var(--color-ink);

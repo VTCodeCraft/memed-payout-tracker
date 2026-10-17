@@ -6,6 +6,7 @@ import { Faq } from "@/components/faq";
 import { ForBrandsAndCreators } from "@/components/for-brands-and-creators";
 import { Guarantees } from "@/components/guarantees";
 import { LandingFooter } from "@/components/landing-footer";
+import { LandingNav } from "@/components/landing-nav";
 import { LandingSection } from "@/components/landing-section";
 import { MilestoneList } from "@/components/milestone-list";
 import { PayoutCalculator } from "@/components/payout-calculator";
@@ -35,7 +36,15 @@ const STEPS = [
 
 export default function Home() {
   return (
-    <AppShell actions={<PublicHeaderActions />} footer={<LandingFooter />}>
+    <AppShell
+      actions={
+        <>
+          <LandingNav />
+          <PublicHeaderActions />
+        </>
+      }
+      footer={<LandingFooter />}
+    >
       <section className="grid items-center gap-12 py-4 md:py-10 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:gap-16">
         <div>
           <p className="text-sm font-medium lowercase text-muted">meme&apos;d · campaign payout tracker</p>
