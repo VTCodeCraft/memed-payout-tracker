@@ -4,6 +4,7 @@ import { BudgetSummary } from "@/components/budget-summary";
 import { Card } from "@/components/card";
 import { LandingSection } from "@/components/landing-section";
 import { MilestoneList } from "@/components/milestone-list";
+import { PayoutCalculator } from "@/components/payout-calculator";
 import { PublicHeaderActions } from "@/components/public-header-actions";
 import { StartLinks } from "@/components/start-links";
 
@@ -88,6 +89,14 @@ export default function Home() {
             </li>
           ))}
         </ol>
+      </LandingSection>
+
+      <LandingSection
+        id="calculator"
+        title="Work out a payout"
+        intro="Type a view count to see what one post earns on the example campaign's ladder."
+      >
+        <PayoutCalculator milestones={EXAMPLE.milestones} />
       </LandingSection>
     </AppShell>
   );
