@@ -3,6 +3,7 @@ import { Badge } from "@/components/badge";
 import { BudgetSummary } from "@/components/budget-summary";
 import { Card } from "@/components/card";
 import { ForBrandsAndCreators } from "@/components/for-brands-and-creators";
+import { Guarantees } from "@/components/guarantees";
 import { LandingSection } from "@/components/landing-section";
 import { MilestoneList } from "@/components/milestone-list";
 import { PayoutCalculator } from "@/components/payout-calculator";
@@ -94,6 +95,8 @@ export default function Home() {
       </LandingSection>
 
       <ForBrandsAndCreators />
+
+      <Guarantees />
     </AppShell>
   );
 }
