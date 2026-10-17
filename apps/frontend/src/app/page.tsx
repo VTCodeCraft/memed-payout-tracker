@@ -2,24 +2,18 @@ import { AppShell } from "@/components/app-shell";
 import { Badge } from "@/components/badge";
 import { BudgetSummary } from "@/components/budget-summary";
 import { Card } from "@/components/card";
+import { ForBrandsAndCreators } from "@/components/for-brands-and-creators";
 import { LandingSection } from "@/components/landing-section";
 import { MilestoneList } from "@/components/milestone-list";
 import { PayoutCalculator } from "@/components/payout-calculator";
 import { PublicHeaderActions } from "@/components/public-header-actions";
 import { StartLinks } from "@/components/start-links";
+import { EXAMPLE_BUDGET, EXAMPLE_LADDER } from "@/lib/example-campaign";
 
 // The example on the right is drawn with the same components as the dashboards, so the
-// landing page shows the product as it is rather than an illustration of it.
-const EXAMPLE = {
-  totalBudget: 6_000,
-  spent: 2_000,
-  remaining: 4_000,
-  milestones: [
-    { views: 10_000, payout: 500 },
-    { views: 50_000, payout: 2_000 },
-    { views: 100_000, payout: 5_000 },
-  ],
-};
+// landing page shows the product as it is rather than an illustration of it. It is the
+// worked example after its first post reached 60,000 views and was paid ₹2,000.
+const HERO_BUDGET = { totalBudget: EXAMPLE_BUDGET, spent: 2_000, remaining: EXAMPLE_BUDGET - 2_000 };
 
 const STEPS = [
   {
@@ -64,10 +58,10 @@ export default function Home() {
                 <Badge tone="green">Live</Badge>
               </div>
             </div>
-            <BudgetSummary campaign={EXAMPLE} />
+            <BudgetSummary campaign={HERO_BUDGET} />
             <div>
               <p className="mb-2 text-sm font-semibold">Milestones</p>
-              <MilestoneList milestones={EXAMPLE.milestones} />
+              <MilestoneList milestones={EXAMPLE_LADDER} />
             </div>
             <p className="border-t border-ink/10 pt-4 text-sm text-pretty">
               A post at <span className="font-semibold tabular-nums">60,000 views</span> has passed two milestones and
@@ -96,8 +90,10 @@ export default function Home() {
         title="Work out a payout"
         intro="Type a view count to see what one post earns on the example campaign's ladder."
       >
-        <PayoutCalculator milestones={EXAMPLE.milestones} />
+        <PayoutCalculator milestones={EXAMPLE_LADDER} />
       </LandingSection>
+
+      <ForBrandsAndCreators />
     </AppShell>
   );
 }
