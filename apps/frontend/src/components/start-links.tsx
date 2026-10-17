@@ -23,7 +23,7 @@ export function StartLinks() {
           Get started
         </Link>
       )}
-      <a href="#how-payouts-work" className="font-semibold underline underline-offset-4 transition-colors hover:text-brand">
+      <a href="#how-payouts-work" className="inline-flex min-h-11 items-center font-semibold underline underline-offset-4 hover:text-brand">
         How payouts work
       </a>
     </div>
