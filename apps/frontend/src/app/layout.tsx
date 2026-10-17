@@ -9,9 +9,22 @@ const bricolage = Bricolage_Grotesque({
   display: "swap",
 });
 
+const DESCRIPTION =
+  "Brands fund campaigns with a budget and a ladder of view milestones. Creators submit Instagram and YouTube posts and earn the highest milestone their views reach.";
+
+// The Open Graph image comes from app/opengraph-image.tsx. On Vercel, Next.js makes its URL
+// absolute with the production domain, so no metadataBase is needed.
 export const metadata: Metadata = {
   title: { default: "Meme'd Payout Tracker", template: TITLE_TEMPLATE },
-  description: "Milestone-based campaign payouts for brands and creators.",
+  description: DESCRIPTION,
+  openGraph: {
+    type: "website",
+    siteName: "Meme'd Payout Tracker",
+    title: "Meme'd Payout Tracker",
+    description: DESCRIPTION,
+    locale: "en_IN",
+  },
+  twitter: { card: "summary_large_image" },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
