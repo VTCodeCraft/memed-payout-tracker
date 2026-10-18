@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { Alert } from "@/components/alert";
 import { AuthSubmit } from "@/components/auth-submit";
 import { PasswordField } from "@/components/password-field";
@@ -10,9 +10,9 @@ import { SIGNUP_FIELDS, type SignupForm as SignupValues, authFailure, checkSignu
 import type { Role } from "@/lib/session";
 import { useFormSubmit } from "@/lib/use-form-submit";
 
-const ROLE_OPTIONS: { value: Role; title: string; description: string }[] = [
-  { value: "brand", title: "Brand", description: "Run campaigns with a budget and milestone payouts." },
-  { value: "creator", title: "Creator", description: "Post for live campaigns and earn as your views grow." },
+const ROLE_OPTIONS: { value: Role; title: string; description: string; icon: ReactNode }[] = [
+  { value: "brand", title: "Brand", description: "Run campaigns with a budget and milestone payouts.", icon: <RoleIcon role="brand" /> },
+  { value: "creator", title: "Creator", description: "Post for live campaigns and earn as your views grow.", icon: <RoleIcon role="creator" /> },
 ];
 
 export function SignupForm() {
@@ -66,11 +66,28 @@ export function SignupForm() {
         value={values.role}
         onChange={(role) => update("role", role)}
         error={feedback.fields.role}
+        columns={1}
       />
 
       {feedback.message && <Alert>{feedback.message}</Alert>}
 
       <AuthSubmit label="Create account" pendingLabel="Creating account…" pending={pending} slow={slow} />
     </form>
+  );
+}
+
+/** A megaphone for brands, a video camera for creators. */
+function RoleIcon({ role }: { role: Role }) {
+  return (
+    <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      {role === "brand" ? (
+        <path d="M4 10v4h3l6 4V6l-6 4H4ZM17 9.5a3.5 3.5 0 0 1 0 5" />
+      ) : (
+        <>
+          <rect x="2.5" y="6" width="13" height="12" rx="3" />
+          <path d="m15.5 10.5 6-3.5v10l-6-3.5" />
+        </>
+      )}
+    </svg>
   );
 }

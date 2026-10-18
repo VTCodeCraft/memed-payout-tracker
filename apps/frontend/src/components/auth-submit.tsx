@@ -12,7 +12,7 @@ interface AuthSubmitProps {
 export function AuthSubmit({ label, pendingLabel, pending, slow }: AuthSubmitProps) {
   return (
     <div>
-      <Button type="submit" disabled={pending} className="w-full">
+      <Button type="submit" loading={pending} className="w-full">
         {pending ? pendingLabel : label}
       </Button>
       {/* Always rendered: a live region must exist before its text changes to be announced. */}

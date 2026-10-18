@@ -21,7 +21,7 @@ export function SignedOutOnly({ children }: { children: ReactNode }) {
 
   if (home) {
     return (
-      <p role="status" className="text-muted">
+      <p role="status" className="py-12 text-center text-muted">
         Opening your dashboard…
       </p>
     );
