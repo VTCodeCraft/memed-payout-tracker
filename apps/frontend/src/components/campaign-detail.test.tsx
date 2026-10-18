@@ -106,6 +106,24 @@ describe("CampaignDetail", () => {
     assert.equal(link?.rel, "noopener noreferrer");
   });
 
+  it("says what the remaining budget still covers at the top milestone", async () => {
+    const outlook = async (remaining: number) => {
+      answer(
+        () => json(200, { campaign: { ...campaign, status: remaining > 0 ? "live" : "exhausted", spent: 2500 - remaining, remaining } }),
+        () => json(200, { submissions: [] }),
+      );
+      const { container, unmount } = await renderDetail();
+      const text = container.textContent ?? "";
+      unmount();
+      mock.restoreAll();
+      return text;
+    };
+
+    assert.match(await outlook(2500), /What's left covers at least 1 post at the top milestone \(₹2,000 each\)/);
+    assert.match(await outlook(1500), /less than the top payout of ₹2,000, so a post reaching it may be paid only in part/);
+    assert.match(await outlook(0), /The budget is used up\. Milestones that posts reach from now on are recorded as unfunded/);
+  });
+
   it("flags posts whose views grew unusually fast, and explains the flag", async () => {
     const spike = { detectedAt: "2026-10-13T12:00:00.000Z", fromViews: 0, toViews: 60000, viewsPerHour: 60000 };
     answer(

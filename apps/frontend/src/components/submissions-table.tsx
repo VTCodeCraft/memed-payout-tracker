@@ -36,10 +36,15 @@ export function SubmissionsTable({ submissions, campaignOf, campaignHref, labell
     // Focusable so keyboard users can scroll the table sideways if it is ever wider than its box. `relative`
     // makes this box the containing block of the absolutely positioned sr-only text, so it
     // scrolls with the table instead of escaping it and widening the page.
-    <div tabIndex={0} role="region" aria-labelledby={labelledBy} className="relative lg:overflow-x-auto">
+    <div
+      tabIndex={0}
+      role="region"
+      aria-labelledby={labelledBy}
+      className="relative lg:overflow-x-auto lg:rounded-2xl lg:border lg:border-ink lg:bg-white lg:px-5 lg:pt-4 lg:pb-2"
+    >
       <table role="table" className="w-full text-left tabular-nums lg:min-w-2xl">
         <thead role="rowgroup" className="text-sm text-muted max-lg:sr-only">
-          <tr role="row" className="border-b border-ink/15">
+          <tr role="row" className="lg:border-b lg:border-ink/15">
             {campaignHref && (
               <th role="columnheader" scope="col" className="pb-2 pr-4 font-medium">Campaign</th>
             )}
@@ -59,7 +64,7 @@ export function SubmissionsTable({ submissions, campaignOf, campaignHref, labell
               <tr
                 key={submission.id}
                 role="row"
-                className="align-middle max-lg:grid max-lg:grid-cols-2 max-lg:gap-x-4 max-lg:gap-y-3 max-lg:rounded-2xl max-lg:border max-lg:border-ink max-lg:bg-white max-lg:p-4 lg:border-b lg:border-ink/10"
+                className="align-middle max-lg:grid max-lg:grid-cols-2 max-lg:gap-x-4 max-lg:gap-y-3 max-lg:rounded-2xl max-lg:border max-lg:border-ink max-lg:bg-white max-lg:p-4 lg:border-b lg:border-ink/10 lg:last:border-b-0"
               >
                 {campaignHref && (
                   <td role="cell" data-label="Campaign" className={`${CELL} max-lg:col-span-2`}>
@@ -117,7 +122,7 @@ export function SubmissionsTable({ submissions, campaignOf, campaignHref, labell
         </tbody>
       </table>
       {showSpikeFlags && submissions.some((submission) => submission.viewSpike) && (
-        <p className="mt-3 text-sm text-muted">
+        <p className="mt-3 text-sm text-muted lg:mb-2 lg:border-t lg:border-ink/10 lg:pt-3">
           <span className="font-semibold text-ink">Fast growth</span> marks a post whose views rose by 10,000 or more
           in an hour at least once. It is a prompt to review the post; it never changes a payout.
         </p>
@@ -153,5 +158,19 @@ export function SubmissionsSkeleton() {
         <Skeleton key={row} className="h-14 w-full rounded-2xl lg:h-10 lg:rounded-lg" />
       ))}
     </div>
+  );
+}
+
+/** How many posts, and what they earned and were paid in total; unfunded only when some is. */
+export function SubmissionTotals({ posts }: { posts: Submission[] }) {
+  const earned = posts.reduce((total, post) => total + post.eligiblePayout, 0);
+  const paid = posts.reduce((total, post) => total + post.paidPayout, 0);
+
+  return (
+    <p className="text-sm text-muted tabular-nums">
+      {posts.length} {posts.length === 1 ? "post" : "posts"} · earned {formatRupees(earned)} · paid{" "}
+      <span className="font-semibold text-ink">{formatRupees(paid)}</span>
+      {earned > paid && <> · {formatRupees(earned - paid)} unfunded</>}
+    </p>
   );
 }
