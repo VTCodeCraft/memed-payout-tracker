@@ -1,7 +1,7 @@
-import { Badge } from "@/components/badge";
+import { CampaignStatusBadge, PlatformBadge } from "@/components/badge";
 import { BudgetSummary } from "@/components/budget-summary";
 import { Card } from "@/components/card";
-import { type Campaign, PLATFORM_LABELS, STATUS_LABELS } from "@/lib/campaigns";
+import type { Campaign } from "@/lib/campaigns";
 import { formatDate, formatRupees, formatViews } from "@/lib/format";
 
 /** A campaign page's heading, status, budget and ladder, as brands and creators both see it. */
@@ -14,8 +14,8 @@ export function CampaignSummary({ campaign }: { campaign: Campaign }) {
           <p className="mt-1 text-muted">Created {formatDate(campaign.createdAt)}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Badge>{PLATFORM_LABELS[campaign.platform]}</Badge>
-          <Badge tone={campaign.status === "live" ? "green" : "ink"}>{STATUS_LABELS[campaign.status]}</Badge>
+          <PlatformBadge platform={campaign.platform} />
+          <CampaignStatusBadge status={campaign.status} />
         </div>
       </div>
 

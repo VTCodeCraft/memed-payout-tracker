@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { Badge } from "@/components/badge";
+import { CampaignStatusBadge, PlatformBadge } from "@/components/badge";
 import { BudgetSummary } from "@/components/budget-summary";
 import { Card } from "@/components/card";
 import { MilestoneList } from "@/components/milestone-list";
-import { type Campaign, PLATFORM_LABELS, STATUS_LABELS } from "@/lib/campaigns";
+import type { Campaign } from "@/lib/campaigns";
 import { formatDate } from "@/lib/format";
 
 /**
@@ -34,8 +34,8 @@ export function CampaignCard({ campaign, href }: { campaign: Campaign; href: str
           <p className="text-sm text-muted">Created {formatDate(campaign.createdAt)}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Badge>{PLATFORM_LABELS[campaign.platform]}</Badge>
-          <Badge tone={campaign.status === "live" ? "green" : "ink"}>{STATUS_LABELS[campaign.status]}</Badge>
+          <PlatformBadge platform={campaign.platform} />
+          <CampaignStatusBadge status={campaign.status} />
         </div>
       </div>
       <BudgetSummary campaign={campaign} />

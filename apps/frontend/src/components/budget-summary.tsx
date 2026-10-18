@@ -1,3 +1,4 @@
+import { Meter } from "@/components/meter";
 import { type Campaign, spentPercent } from "@/lib/campaigns";
 import { formatRupees } from "@/lib/format";
 
@@ -20,10 +21,7 @@ export function BudgetSummary({ campaign }: { campaign: Pick<Campaign, "totalBud
           </div>
         ))}
       </dl>
-      {/* The figures above carry the meaning; the bar repeats them visually. */}
-      <div aria-hidden="true" className="mt-3 h-2.5 overflow-hidden rounded-full border border-ink">
-        <div className="h-full bg-ink" style={{ width: `${percent}%` }} />
-      </div>
+      <Meter segments={[{ value: percent }]} className="mt-3" />
       <p className="mt-1.5 text-sm text-muted tabular-nums">{percent}% of the budget paid out</p>
     </div>
   );
