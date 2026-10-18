@@ -1,6 +1,6 @@
 "use client";
 
-import { CampaignCard } from "@/components/campaign-card";
+import { CampaignCard, CampaignCardsSkeleton } from "@/components/campaign-card";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
 import { QueryError, QueryLoading } from "@/components/query-status";
@@ -22,7 +22,11 @@ export default function LiveCampaigns() {
       />
 
       <div className="mt-8">
-        {state.status === "loading" && <QueryLoading label="Loading live campaigns…" />}
+        {state.status === "loading" && (
+          <QueryLoading label="Loading live campaigns…">
+            <CampaignCardsSkeleton />
+          </QueryLoading>
+        )}
         {state.status === "error" && (
           <QueryError title="We couldn't load live campaigns" error={state.error} onRetry={retry} />
         )}
