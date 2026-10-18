@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { BrandMark } from "@/components/brand-mark";
 
 interface AppShellProps {
   /** Links for the signed-in role, rendered inside <nav>; omitted on public pages. */
@@ -30,8 +31,11 @@ export function AppShell({ nav, actions, footer, background = "white", children 
       <header className="border-b border-ink bg-white">
         <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-x-4 gap-y-3 px-4 py-4 md:gap-x-8 md:px-8">
           {/* The suffix is dropped on phones so the actions stay on the wordmark's row. */}
-          <Link href="/" className="text-xl font-bold tracking-tight">
-            meme&apos;d <span className="hidden font-medium text-muted sm:inline">payouts</span>
+          <Link href="/" className="flex items-center gap-2 text-xl font-bold tracking-tight">
+            <BrandMark />
+            <span>
+              meme&apos;d <span className="hidden font-medium text-muted sm:inline">payouts</span>
+            </span>
           </Link>
           {nav && (
             <nav aria-label="Main" className="order-last w-full md:order-none md:w-auto">
