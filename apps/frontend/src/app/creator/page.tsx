@@ -19,6 +19,14 @@ export default function LiveCampaigns() {
         eyebrow="creator dashboard"
         title="Live campaigns"
         description="Post for a campaign on its platform, then submit the link. A post earns the payout of the highest milestone its views reach, as long as the campaign's budget lasts."
+        actions={
+          state.status === "success" &&
+          state.data.campaigns.length > 0 && (
+            <p className="text-sm font-medium text-muted tabular-nums">
+              {state.data.campaigns.length} {state.data.campaigns.length === 1 ? "campaign" : "campaigns"} taking posts
+            </p>
+          )
+        }
       />
 
       <div className="mt-8">
