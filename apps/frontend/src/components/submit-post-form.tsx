@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { Alert } from "@/components/alert";
+import { Alert, Notice } from "@/components/alert";
 import { Button } from "@/components/button";
 import { TextField } from "@/components/text-field";
 import { ApiError } from "@/lib/api-client";
@@ -31,7 +31,7 @@ export function SubmitPostForm({ campaign, onSubmitted }: SubmitPostFormProps) {
   const { token, expire } = useSignedInSession();
   const [values, setValues] = useState<PostForm>({ postUrl: "" });
   const [submitted, setSubmitted] = useState(false);
-  const notice = useRef<HTMLParagraphElement>(null);
+  const notice = useRef<HTMLDivElement>(null);
   const { feedback, pending, slow, handleSubmit } = useFormSubmit({
     fields: POST_FIELDS,
     values,
@@ -56,10 +56,10 @@ export function SubmitPostForm({ campaign, onSubmitted }: SubmitPostFormProps) {
   return (
     <form noValidate onSubmit={handleSubmit} className="flex flex-col gap-4">
       {submitted && (
-        <p ref={notice} tabIndex={-1} role="status" className="rounded-2xl border border-ink bg-lime px-4 py-3 text-sm font-medium">
+        <Notice ref={notice} tabIndex={-1} tone="success">
           Link submitted. It is listed under your posts with 0 views. This app does not check the post itself: views
           arrive through the view-update feed (simulated here), and payouts follow them.
-        </p>
+        </Notice>
       )}
       <TextField
         label="Post link"

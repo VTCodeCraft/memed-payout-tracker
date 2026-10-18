@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { flushSync } from "react-dom";
+import { Notice } from "@/components/alert";
 import { Button } from "@/components/button";
 import { CampaignCard } from "@/components/campaign-card";
 import { Card } from "@/components/card";
@@ -19,7 +20,7 @@ export default function BrandDashboard() {
   const [created, setCreated] = useState<Campaign[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const createButton = useRef<HTMLButtonElement>(null);
-  const noticeRef = useRef<HTMLParagraphElement>(null);
+  const noticeRef = useRef<HTMLDivElement>(null);
 
   function openForm() {
     setNotice(null);
@@ -63,14 +64,9 @@ export default function BrandDashboard() {
       </div>
 
       {notice && (
-        <p
-          ref={noticeRef}
-          tabIndex={-1}
-          role="status"
-          className="mt-6 rounded-2xl border border-ink bg-lime px-4 py-3 font-medium"
-        >
+        <Notice ref={noticeRef} tabIndex={-1} tone="success" className="mt-6">
           {notice}
-        </p>
+        </Notice>
       )}
 
       {creating && (
