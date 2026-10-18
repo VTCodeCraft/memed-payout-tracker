@@ -140,18 +140,18 @@ export function SignedInLayout({ role, children }: { role: Role; children: React
   );
 }
 
-/** Who is signed in: an initial, then name and role from 640px up (the initial carries both for screen readers below). */
+/** Who is signed in: an initial, then name and role from 1024px up, where they fit beside the nav (screen readers get both below). */
 function UserChip({ name, role }: { name: string; role: Role }) {
   return (
     <div className="flex items-center gap-2.5">
       <span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand-tint font-semibold text-brand">
         {name.trim().charAt(0).toUpperCase() || "?"}
       </span>
-      <span className="hidden min-w-0 flex-col leading-tight sm:flex">
+      <span className="hidden min-w-0 flex-col leading-tight lg:flex">
         <span className="max-w-44 truncate font-medium">{name}</span>
         <span className="text-sm text-muted">{ROLE_LABELS[role]}</span>
       </span>
-      <span className="sr-only sm:hidden">
+      <span className="sr-only lg:hidden">
         {name}, {ROLE_LABELS[role]}
       </span>
     </div>
