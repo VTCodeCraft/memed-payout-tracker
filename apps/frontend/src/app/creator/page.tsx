@@ -1,7 +1,7 @@
 "use client";
 
 import { CampaignCard } from "@/components/campaign-card";
-import { Card } from "@/components/card";
+import { EmptyState } from "@/components/empty-state";
 import { QueryError, QueryLoading } from "@/components/query-status";
 import type { Campaign } from "@/lib/campaigns";
 import { useSignedInSession } from "@/lib/signed-in";
@@ -27,12 +27,9 @@ export default function LiveCampaigns() {
           <QueryError title="We couldn't load live campaigns" error={state.error} onRetry={retry} />
         )}
         {state.status === "success" && state.data.campaigns.length === 0 && (
-          <Card className="max-w-xl">
-            <h2 className="text-xl font-semibold tracking-tight">No live campaigns right now</h2>
-            <p className="mt-2 text-muted">
-              Campaigns appear here as soon as a brand creates them, and leave once their budget is used up.
-            </p>
-          </Card>
+          <EmptyState title="No live campaigns right now">
+            Campaigns appear here as soon as a brand creates them, and leave once their budget is used up.
+          </EmptyState>
         )}
         {state.status === "success" && state.data.campaigns.length > 0 && (
           <ul className="grid gap-6 lg:grid-cols-2">

@@ -5,8 +5,8 @@ import { flushSync } from "react-dom";
 import { Notice } from "@/components/alert";
 import { Button } from "@/components/button";
 import { CampaignCard } from "@/components/campaign-card";
-import { Card } from "@/components/card";
 import { CreateCampaignForm } from "@/components/create-campaign-form";
+import { EmptyState } from "@/components/empty-state";
 import { QueryError, QueryLoading } from "@/components/query-status";
 import type { Campaign } from "@/lib/campaigns";
 import { useSignedInSession } from "@/lib/signed-in";
@@ -81,13 +81,10 @@ export default function BrandDashboard() {
           <QueryError title="We couldn't load your campaigns" error={state.error} onRetry={retry} />
         )}
         {state.status === "success" && campaigns.length === 0 && !creating && (
-          <Card className="max-w-xl">
-            <h2 className="text-xl font-semibold tracking-tight">No campaigns yet</h2>
-            <p className="mt-2 text-muted">
-              A campaign has a name, a platform, a budget and a milestone ladder. Creators can submit posts to it as
-              soon as it exists.
-            </p>
-          </Card>
+          <EmptyState title="No campaigns yet">
+            A campaign has a name, a platform, a budget and a milestone ladder. Creators can submit posts to it as soon
+            as it exists. Use Create campaign to set up your first one.
+          </EmptyState>
         )}
         {campaigns.length > 0 && (
           <ul className="grid gap-6 lg:grid-cols-2">
