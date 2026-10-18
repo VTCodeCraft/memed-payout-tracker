@@ -16,6 +16,7 @@ import {
   createCampaign,
 } from "@/lib/campaign-form";
 import { type Campaign, PLATFORMS, PLATFORM_LABELS } from "@/lib/campaigns";
+import { formatRupees } from "@/lib/format";
 import { useSignedInSession } from "@/lib/signed-in";
 import { useFormSubmit } from "@/lib/use-form-submit";
 
@@ -71,12 +72,14 @@ export function CreateCampaignForm({ onCreated, onCancel }: CreateCampaignFormPr
   }
 
   const ladderError = feedback.fields.milestones;
+  const coverage = ladderCoverage(values);
 
   return (
     <Card>
       <h2 ref={heading} tabIndex={-1} className="text-2xl font-semibold tracking-tight">
         New campaign
       </h2>
+      <p className="mt-1 text-muted">It goes live as soon as you create it, and can&apos;t be edited afterwards.</p>
       <form noValidate onSubmit={handleSubmit} className="mt-6 flex flex-col gap-6">
         <TextField
           label="Campaign name"
@@ -109,9 +112,10 @@ export function CreateCampaignForm({ onCreated, onCancel }: CreateCampaignFormPr
           name="milestones"
           tabIndex={-1}
           aria-describedby={[`${ids}-ladder-hint`, ladderError && `${ids}-ladder-error`].filter(Boolean).join(" ")}
+          className="border-t border-ink/10 pt-6"
         >
-          <legend className="text-sm font-semibold">Milestone ladder</legend>
-          <p id={`${ids}-ladder-hint`} className="mt-1.5 text-sm text-muted">
+          <legend className="float-left w-full text-sm font-semibold">Milestone ladder</legend>
+          <p id={`${ids}-ladder-hint`} className="clear-left pt-1.5 text-sm text-muted">
             A post earns the payout of the highest milestone its views reach. Each milestone needs more views and a
             higher payout than the one before, and no payout can be more than the total budget.
           </p>
@@ -123,18 +127,19 @@ export function CreateCampaignForm({ onCreated, onCancel }: CreateCampaignFormPr
           <ol className="mt-4 flex flex-col gap-3">
             {rows.map((row, index) => (
               <li key={row.id}>
-                <div role="group" aria-labelledby={`${ids}-row-${row.id}`} className="rounded-2xl border border-ink p-4">
-                  <div className="flex items-center justify-between gap-3">
+                {/* A light fill rather than a border, so the rows don't read as cards inside the card. */}
+                <div role="group" aria-labelledby={`${ids}-row-${row.id}`} className="rounded-xl bg-canvas p-4">
+                  <div className="flex min-h-11 items-center justify-between gap-3">
                     <p id={`${ids}-row-${row.id}`} className="font-semibold">
                       Milestone {index + 1}
                     </p>
                     {rows.length > 1 && (
-                      <Button variant="secondary" onClick={() => removeRow(row.id)} disabled={pending}>
+                      <Button variant="ghost" size="sm" onClick={() => removeRow(row.id)} disabled={pending}>
                         Remove<span className="sr-only"> milestone {index + 1}</span>
                       </Button>
                     )}
                   </div>
-                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <div className="mt-2 grid gap-3 sm:grid-cols-2">
                     <TextField
                       label="Views"
                       name={`milestones.${index}.views`}
@@ -157,20 +162,30 @@ export function CreateCampaignForm({ onCreated, onCancel }: CreateCampaignFormPr
             ))}
           </ol>
           <div className="mt-3 flex flex-wrap items-center gap-3">
-            <Button variant="secondary" onClick={addRow} disabled={pending || rows.length >= MAX_MILESTONES}>
+            <Button variant="secondary" size="sm" onClick={addRow} disabled={pending || rows.length >= MAX_MILESTONES}>
               Add milestone
             </Button>
             {rows.length >= MAX_MILESTONES && (
               <p className="text-sm text-muted">A campaign can have up to {MAX_MILESTONES} milestones.</p>
             )}
           </div>
+          {coverage && (
+            <p className="mt-4 rounded-xl bg-brand-tint px-4 py-3 text-sm">
+              The top milestone pays <strong className="font-semibold tabular-nums">{formatRupees(coverage.topPayout)}</strong>
+              , so this budget covers at least{" "}
+              <strong className="font-semibold tabular-nums">
+                {coverage.posts} {coverage.posts === 1 ? "post" : "posts"}
+              </strong>{" "}
+              that reach it.
+            </p>
+          )}
         </fieldset>
 
         {feedback.message && <Alert>{feedback.message}</Alert>}
 
-        <div>
+        <div className="border-t border-ink/10 pt-6">
           <div className="flex flex-wrap gap-3">
-            <Button type="submit" disabled={pending}>
+            <Button type="submit" loading={pending}>
               {pending ? "Creating campaign…" : "Create campaign"}
             </Button>
             <Button variant="secondary" onClick={onCancel} disabled={pending}>
@@ -185,4 +200,16 @@ export function CreateCampaignForm({ onCreated, onCancel }: CreateCampaignFormPr
       </form>
     </Card>
   );
+}
+
+/**
+ * How many posts the budget can pay at the top milestone, once the budget and the last
+ * row's payout read as whole rupees; a quick check that the ladder fits the budget.
+ */
+function ladderCoverage({ totalBudget, milestones }: CampaignForm): { topPayout: number; posts: number } | null {
+  const read = (raw: string) => (/^\d+$/.test(raw.replace(/[\s,]/g, "")) ? Number(raw.replace(/[\s,]/g, "")) : 0);
+  const budget = read(totalBudget);
+  const topPayout = read(milestones.at(-1)?.payout ?? "");
+  if (budget <= 0 || topPayout <= 0 || topPayout > budget) return null;
+  return { topPayout, posts: Math.floor(budget / topPayout) };
 }

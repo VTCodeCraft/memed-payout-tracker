@@ -43,6 +43,19 @@ describe("CreateCampaignForm", () => {
     document.body.innerHTML = "";
   });
 
+  it("says how many posts the budget covers at the top milestone, once both read as rupees", async () => {
+    const { container } = await renderForm();
+    const coverage = () => [...container.querySelectorAll("p")].find((p) => /budget covers/.test(p.textContent ?? ""))?.textContent;
+    assert.equal(coverage(), undefined);
+
+    await typeInto(input(container, "totalBudget"), "6,000");
+    await typeInto(input(container, "milestones.0.payout"), "2,500");
+    assert.equal(coverage(), "The top milestone pays ₹2,500, so this budget covers at least 2 posts that reach it.");
+
+    await typeInto(input(container, "milestones.0.payout"), "7000");
+    assert.equal(coverage(), undefined, "no hint when the payout is more than the budget; validation explains that");
+  });
+
   it("adds milestone rows up to ten and removes any row, renumbering the rest", async () => {
     const { container } = await renderForm();
     assert.deepEqual(rowLabels(container), ["Milestone 1"]);
