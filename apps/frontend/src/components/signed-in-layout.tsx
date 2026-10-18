@@ -4,23 +4,27 @@ import { useRouter } from "next/navigation";
 import { type ReactNode, useEffect, useState } from "react";
 import { Alert } from "@/components/alert";
 import { AppShell } from "@/components/app-shell";
-import { Badge } from "@/components/badge";
 import { Button } from "@/components/button";
+import { Card } from "@/components/card";
 import { NavLink } from "@/components/nav-link";
+import { QueryLoading } from "@/components/query-status";
+import { Skeleton } from "@/components/skeleton";
 import { ApiError } from "@/lib/api-client";
 import { type SessionCheck, decideAccess } from "@/lib/route-guard";
 import { type Role, clearSession, getSession, useStoredSession, verifySession } from "@/lib/session";
 import { SignedInContext } from "@/lib/signed-in";
-import { useSlowRequest } from "@/lib/use-slow-request";
 
-// Each role's main destinations; NavLink marks the current one.
-const NAV: Record<Role, { href: string; label: string }[]> = {
-  brand: [{ href: "/brand", label: "Dashboard" }],
+// Each role's main destinations; NavLink marks the current one, including on the
+// campaign pages each list opens.
+const NAV: Record<Role, { href: string; label: string; activeFor?: string[] }[]> = {
+  brand: [{ href: "/brand", label: "Dashboard", activeFor: ["/brand/campaigns/"] }],
   creator: [
-    { href: "/creator", label: "Live campaigns" },
+    { href: "/creator", label: "Live campaigns", activeFor: ["/creator/campaigns/"] },
     { href: "/creator/earnings", label: "My earnings" },
   ],
 };
+
+const ROLE_LABELS: Record<Role, string> = { brand: "Brand", creator: "Creator" };
 
 /**
  * Frame for one role's pages. It verifies the stored token with /auth/me once per page
@@ -52,7 +56,6 @@ export function SignedInLayout({ role, children }: { role: Role; children: React
 
   const access = decideAccess(stored, check, role);
   const redirectTo = access.view === "redirect" ? access.to : null;
-  const slow = useSlowRequest(access.view === "loading" && Boolean(stored));
 
   useEffect(() => {
     if (redirectTo) router.replace(redirectTo);
@@ -69,16 +72,16 @@ export function SignedInLayout({ role, children }: { role: Role; children: React
     };
     return (
       <AppShell
-        nav={NAV[user.role].map(({ href, label }) => (
-          <NavLink key={href} href={href}>
+        background="canvas"
+        nav={NAV[user.role].map(({ href, label, activeFor }) => (
+          <NavLink key={href} href={href} activeFor={activeFor}>
             {label}
           </NavLink>
         ))}
         actions={
           <>
-            <span className="hidden max-w-48 truncate font-medium sm:inline">{user.name}</span>
-            <Badge tone="ink">{user.role}</Badge>
-            <Button variant="secondary" onClick={clearSession}>
+            <UserChip name={user.name} role={user.role} />
+            <Button variant="secondary" size="sm" onClick={clearSession}>
               Log out
             </Button>
           </>
@@ -91,8 +94,8 @@ export function SignedInLayout({ role, children }: { role: Role; children: React
 
   if (access.view === "error") {
     return (
-      <AppShell>
-        <div className="flex max-w-md flex-col gap-4">
+      <AppShell background="canvas">
+        <Card className="flex max-w-md flex-col gap-4">
           <h1 className="text-2xl font-semibold tracking-tight">We couldn&apos;t check your session</h1>
           <Alert>{access.message}</Alert>
           <div className="flex flex-wrap gap-3">
@@ -108,17 +111,49 @@ export function SignedInLayout({ role, children }: { role: Role; children: React
               Log out
             </Button>
           </div>
-        </div>
+        </Card>
       </AppShell>
     );
   }
 
+  if (access.view === "redirect") {
+    return (
+      <AppShell background="canvas">
+        <p role="status" className="sr-only">
+          Redirecting…
+        </p>
+      </AppShell>
+    );
+  }
+
+  // Nothing protected is shown until /auth/me answers; the skeleton holds the page's shape.
   return (
-    <AppShell>
-      <div role="status" className="text-muted">
-        <p>{access.view === "redirect" ? "Redirecting…" : "Checking your session…"}</p>
-        {slow && <p className="mt-2 text-sm">The server sleeps when idle and can take up to a minute to wake up.</p>}
-      </div>
+    <AppShell background="canvas">
+      <QueryLoading label="Checking your session…">
+        <div className="flex flex-col gap-4">
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-9 w-72 max-w-full" />
+          <Skeleton className="mt-4 h-48 w-full max-w-3xl rounded-2xl" />
+        </div>
+      </QueryLoading>
     </AppShell>
+  );
+}
+
+/** Who is signed in: an initial, then name and role from 640px up (the initial carries both for screen readers below). */
+function UserChip({ name, role }: { name: string; role: Role }) {
+  return (
+    <div className="flex items-center gap-2.5">
+      <span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand-tint font-semibold text-brand">
+        {name.trim().charAt(0).toUpperCase() || "?"}
+      </span>
+      <span className="hidden min-w-0 flex-col leading-tight sm:flex">
+        <span className="max-w-44 truncate font-medium">{name}</span>
+        <span className="text-sm text-muted">{ROLE_LABELS[role]}</span>
+      </span>
+      <span className="sr-only sm:hidden">
+        {name}, {ROLE_LABELS[role]}
+      </span>
+    </div>
   );
 }

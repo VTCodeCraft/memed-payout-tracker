@@ -7,6 +7,7 @@ import { Button } from "@/components/button";
 import { CampaignCard } from "@/components/campaign-card";
 import { CreateCampaignForm } from "@/components/create-campaign-form";
 import { EmptyState } from "@/components/empty-state";
+import { PageHeader } from "@/components/page-header";
 import { QueryError, QueryLoading } from "@/components/query-status";
 import type { Campaign } from "@/lib/campaigns";
 import { useSignedInSession } from "@/lib/signed-in";
@@ -51,17 +52,17 @@ export default function BrandDashboard() {
 
   return (
     <>
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-sm font-medium lowercase text-muted">brand dashboard</p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight md:text-4xl">Your campaigns</h1>
-        </div>
-        {!creating && (
-          <Button ref={createButton} onClick={openForm}>
-            Create campaign
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        eyebrow="brand dashboard"
+        title="Your campaigns"
+        actions={
+          !creating && (
+            <Button ref={createButton} onClick={openForm}>
+              Create campaign
+            </Button>
+          )
+        }
+      />
 
       {notice && (
         <Notice ref={noticeRef} tabIndex={-1} tone="success" className="mt-6">

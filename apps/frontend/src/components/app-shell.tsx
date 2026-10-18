@@ -8,6 +8,8 @@ interface AppShellProps {
   actions?: ReactNode;
   /** Page footer content, rendered after <main> so it is the page's contentinfo landmark. */
   footer?: ReactNode;
+  /** "canvas" puts the page on the off-white canvas, so white cards stand out; for the signed-in app. */
+  background?: "white" | "canvas";
   children: ReactNode;
 }
 
@@ -16,7 +18,7 @@ interface AppShellProps {
  * page content. Each role has two or three destinations, so a top bar fits them; on
  * small screens the navigation wraps onto its own row instead of hiding in a menu.
  */
-export function AppShell({ nav, actions, footer, children }: AppShellProps) {
+export function AppShell({ nav, actions, footer, background = "white", children }: AppShellProps) {
   return (
     <>
       <a
@@ -25,7 +27,7 @@ export function AppShell({ nav, actions, footer, children }: AppShellProps) {
       >
         Skip to content
       </a>
-      <header className="border-b border-ink">
+      <header className="border-b border-ink bg-white">
         <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-x-4 gap-y-3 px-4 py-4 md:gap-x-8 md:px-8">
           {/* The suffix is dropped on phones so the actions stay on the wordmark's row. */}
           <Link href="/" className="text-xl font-bold tracking-tight">
@@ -39,9 +41,11 @@ export function AppShell({ nav, actions, footer, children }: AppShellProps) {
           {actions && <div className="ml-auto flex items-center gap-3">{actions}</div>}
         </div>
       </header>
-      <main id="main" className="mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 py-8 md:px-8 md:py-12">
-        {children}
-      </main>
+      <div className={`flex flex-1 flex-col ${background === "canvas" ? "bg-canvas" : ""}`}>
+        <main id="main" className="mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 py-8 md:px-8 md:py-12">
+          {children}
+        </main>
+      </div>
       {footer && (
         <footer className="border-t border-ink">
           <div className="mx-auto w-full max-w-7xl px-4 py-8 md:px-8">{footer}</div>

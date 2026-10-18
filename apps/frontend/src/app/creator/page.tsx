@@ -2,6 +2,7 @@
 
 import { CampaignCard } from "@/components/campaign-card";
 import { EmptyState } from "@/components/empty-state";
+import { PageHeader } from "@/components/page-header";
 import { QueryError, QueryLoading } from "@/components/query-status";
 import type { Campaign } from "@/lib/campaigns";
 import { useSignedInSession } from "@/lib/signed-in";
@@ -14,12 +15,11 @@ export default function LiveCampaigns() {
 
   return (
     <>
-      <p className="text-sm font-medium lowercase text-muted">creator dashboard</p>
-      <h1 className="mt-2 text-3xl font-semibold tracking-tight md:text-4xl">Live campaigns</h1>
-      <p className="mt-3 max-w-2xl text-muted">
-        Post for a campaign on its platform, then submit the link. A post earns the payout of the highest milestone its
-        views reach, as long as the campaign&apos;s budget lasts.
-      </p>
+      <PageHeader
+        eyebrow="creator dashboard"
+        title="Live campaigns"
+        description="Post for a campaign on its platform, then submit the link. A post earns the payout of the highest milestone its views reach, as long as the campaign's budget lasts."
+      />
 
       <div className="mt-8">
         {state.status === "loading" && <QueryLoading label="Loading live campaigns…" />}
