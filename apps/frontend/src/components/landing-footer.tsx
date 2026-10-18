@@ -1,3 +1,4 @@
+import { BrandMark } from "@/components/brand-mark";
 import { apiUrl } from "@/lib/api-url";
 
 const REPO_URL = "https://github.com/VTCodeCraft/memed-payout-tracker";
@@ -13,8 +14,11 @@ const LINKS = [
 export function LandingFooter() {
   return (
     <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-      <p className="text-xl font-bold tracking-tight">
-        meme&apos;d <span className="font-medium text-muted">payouts</span>
+      <p className="flex items-center gap-2 text-xl font-bold tracking-tight">
+        <BrandMark />
+        <span>
+          meme&apos;d <span className="font-medium text-muted">payouts</span>
+        </span>
       </p>
       <nav aria-label="Project">
         <ul className="flex flex-wrap gap-x-6">

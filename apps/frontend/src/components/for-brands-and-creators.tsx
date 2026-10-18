@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Badge } from "@/components/badge";
+import { Badge, CampaignStatusBadge, PlatformBadge } from "@/components/badge";
 import { BudgetSummary } from "@/components/budget-summary";
 import { Card } from "@/components/card";
 import { highestMilestone } from "@/lib/campaigns";
@@ -49,8 +49,8 @@ function ExhaustedCampaignExample() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-xl font-semibold tracking-tight">Diwali reels</p>
         <div className="flex gap-2">
-          <Badge>Instagram</Badge>
-          <Badge tone="ink">Budget exhausted</Badge>
+          <PlatformBadge platform="instagram" />
+          <CampaignStatusBadge status="exhausted" />
         </div>
       </div>
       <BudgetSummary campaign={{ totalBudget: EXAMPLE_BUDGET, spent: EXAMPLE_BUDGET, remaining: 0 }} />

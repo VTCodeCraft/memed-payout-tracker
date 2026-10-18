@@ -1,5 +1,5 @@
 import { AppShell } from "@/components/app-shell";
-import { Badge } from "@/components/badge";
+import { Badge, CampaignStatusBadge, PlatformBadge } from "@/components/badge";
 import { BudgetSummary } from "@/components/budget-summary";
 import { Card } from "@/components/card";
 import { Faq } from "@/components/faq";
@@ -60,38 +60,56 @@ export default function Home() {
           </div>
         </div>
 
-        <figure aria-label="Example campaign">
+        {/* The campaign as its brand sees it, with one creator's post overlapping its corner:
+            both sides of the product, in the worked example's numbers. */}
+        <figure aria-label="Example campaign and one of its posts">
           <p className="mb-3 text-sm font-medium lowercase text-muted">example campaign</p>
           <Card className="flex flex-col gap-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="text-xl font-semibold tracking-tight">Diwali reels</p>
               <div className="flex gap-2">
-                <Badge>Instagram</Badge>
-                <Badge tone="green">Live</Badge>
+                <PlatformBadge platform="instagram" />
+                <CampaignStatusBadge status="live" />
               </div>
             </div>
             <BudgetSummary campaign={HERO_BUDGET} />
-            <div>
+            {/* Extra bottom padding: the post below overlaps this much of the card, and no more. */}
+            <div className="pb-6">
               <p className="mb-2 text-sm font-semibold">Milestones</p>
               <MilestoneList milestones={EXAMPLE_LADDER} />
             </div>
-            <p className="border-t border-ink/10 pt-4 text-sm text-pretty">
-              A post at <span className="font-semibold tabular-nums">60,000 views</span> has passed two milestones and
-              earns <span className="font-semibold tabular-nums">₹2,000</span>, the higher one.
-            </p>
           </Card>
+          <div className="relative mx-3 -mt-10 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-2xl border border-ink bg-white p-4 sm:mr-[-0.75rem] sm:ml-auto sm:w-[25rem] lg:-mr-6">
+            <div>
+              <p className="font-semibold">
+                Reel 1 <span className="font-normal text-muted tabular-nums">· 60,000 views</span>
+              </p>
+              <p className="text-sm text-muted">Passed two milestones, paid the higher</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="font-semibold tabular-nums">₹2,000</span>
+              <Badge tone="green">Paid in full</Badge>
+            </div>
+          </div>
         </figure>
       </section>
 
       <LandingSection id="how-payouts-work" title="How payouts work" intro="The same three rules apply to every campaign.">
-        <ol className="divide-y divide-ink/10">
+        {/* A connected flow from 1024px: a rule runs from each step's number to the next. */}
+        <ol className="grid gap-8 lg:grid-cols-3 lg:gap-6">
           {STEPS.map(({ title, body }, index) => (
-            <li key={title} className="grid grid-cols-[2.5rem_minmax(0,1fr)] gap-x-4 py-6 first:pt-0 last:pb-0">
-              <span className="text-lg font-semibold text-muted tabular-nums">{String(index + 1).padStart(2, "0")}</span>
-              <div>
-                <h3 className="text-lg font-semibold">{title}</h3>
-                <p className="mt-1 max-w-prose text-muted text-pretty">{body}</p>
-              </div>
+            <li key={title} className="relative">
+              {index < STEPS.length - 1 && (
+                <span aria-hidden="true" className="absolute top-4 -right-4 left-11 hidden h-px bg-ink/25 lg:block" />
+              )}
+              <span
+                aria-hidden="true"
+                className="relative grid size-8 place-items-center rounded-full bg-ink text-sm font-semibold text-white tabular-nums"
+              >
+                {index + 1}
+              </span>
+              <h3 className="mt-4 text-lg font-semibold text-balance">{title}</h3>
+              <p className="mt-1 max-w-prose text-muted text-pretty">{body}</p>
             </li>
           ))}
         </ol>
