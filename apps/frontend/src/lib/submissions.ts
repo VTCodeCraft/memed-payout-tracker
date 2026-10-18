@@ -15,6 +15,8 @@ export interface Submission {
   eligiblePayout: number;
   /** What the budget actually paid; less than eligible once the budget ran out. */
   paidPayout: number;
+  /** The latest time the views grew unusually fast (10,000 or more an hour), if ever; never affects payouts. */
+  viewSpike?: { detectedAt: string; fromViews: number; toViews: number; viewsPerHour: number } | null;
   createdAt: string;
 }
 

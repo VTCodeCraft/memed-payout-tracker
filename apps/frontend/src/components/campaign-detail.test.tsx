@@ -106,6 +106,22 @@ describe("CampaignDetail", () => {
     assert.equal(link?.rel, "noopener noreferrer");
   });
 
+  it("flags posts whose views grew unusually fast, and explains the flag", async () => {
+    const spike = { detectedAt: "2026-10-13T12:00:00.000Z", fromViews: 0, toViews: 60000, viewsPerHour: 60000 };
+    answer(
+      () => json(200, { campaign }),
+      () => json(200, { submissions: [{ ...submission("CxSpiked01", 60000, 2000, 2000), viewSpike: spike }, submission("CxSteady01", 900, 0, 0)] }),
+    );
+
+    const { container } = await renderDetail();
+
+    assert.deepEqual(
+      rows(container).map((cells) => cells.at(-1)),
+      ["Paid in full Fast growth", "Not yet eligible"],
+    );
+    assert.match(container.querySelector("section")?.textContent ?? "", /it never changes a payout/);
+  });
+
   it("says why a campaign has no posts", async () => {
     answer(
       () => json(200, { campaign }),

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { CampaignSummary } from "@/components/campaign-summary";
 import { QueryError, QueryLoading } from "@/components/query-status";
-import { SubmissionsTable } from "@/components/submissions-table";
+import { SubmissionsSkeleton, SubmissionsTable } from "@/components/submissions-table";
 import type { Campaign } from "@/lib/campaigns";
 import { useSignedInSession } from "@/lib/signed-in";
 import type { Submission } from "@/lib/submissions";
@@ -61,7 +61,11 @@ export function CampaignDetail({ id }: { id: string }) {
           Submissions
         </h2>
         <div className="mt-4">
-          {submissions.state.status === "loading" && <QueryLoading label="Loading submissions…" />}
+          {submissions.state.status === "loading" && (
+            <QueryLoading label="Loading submissions…">
+              <SubmissionsSkeleton />
+            </QueryLoading>
+          )}
           {submissions.state.status === "error" && (
             <QueryError
               title="We couldn't load the submissions"
@@ -81,6 +85,7 @@ export function CampaignDetail({ id }: { id: string }) {
                 submissions={submissions.state.data.submissions}
                 campaignOf={() => details}
                 labelledBy="submissions-heading"
+                showSpikeFlags
               />
             ))}
         </div>

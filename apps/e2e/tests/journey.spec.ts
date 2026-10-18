@@ -108,9 +108,10 @@ test("a brand's campaign pays a creator's posts up to its budget, and both see t
 
     await page.goto(campaignPath);
     await expect(page.getByRole("heading", { name: "Diwali clips", level: 1 })).toBeVisible();
+    // Both posts gained 10,000+ views within an hour, so the brand sees them flagged for review.
     expect(await tableRows(page, "Submissions")).toEqual([
-      ["instagram.com/p/JourneyB2/ (opens in a new tab)", "90,000", "2 of 2", "₹2,000", "₹500", "₹1,500 unfunded"],
-      ["instagram.com/p/JourneyA1/ (opens in a new tab)", "60,000", "2 of 2", "₹2,000", "₹2,000", "Paid in full"],
+      ["instagram.com/p/JourneyB2/ (opens in a new tab)", "90,000", "2 of 2", "₹2,000", "₹500", "₹1,500 unfunded Fast growth"],
+      ["instagram.com/p/JourneyA1/ (opens in a new tab)", "60,000", "2 of 2", "₹2,000", "₹2,000", "Paid in full Fast growth"],
     ]);
   });
 });

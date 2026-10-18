@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Card } from "@/components/card";
 import { CampaignSummary } from "@/components/campaign-summary";
 import { QueryError, QueryLoading } from "@/components/query-status";
-import { SubmissionsTable } from "@/components/submissions-table";
+import { SubmissionsSkeleton, SubmissionsTable } from "@/components/submissions-table";
 import { SubmitPostForm } from "@/components/submit-post-form";
 import type { Campaign } from "@/lib/campaigns";
 import { useSignedInSession } from "@/lib/signed-in";
@@ -90,7 +90,11 @@ export function CreatorCampaign({ id }: { id: string }) {
             Your posts in this campaign
           </h2>
           <div className="mt-4">
-            {mine.state.status === "loading" && submitted.length === 0 && <QueryLoading label="Loading your posts…" />}
+            {mine.state.status === "loading" && submitted.length === 0 && (
+              <QueryLoading label="Loading your posts…">
+                <SubmissionsSkeleton />
+              </QueryLoading>
+            )}
             {mine.state.status === "error" && (
               <QueryError title="We couldn't load your posts" error={mine.state.error} onRetry={mine.retry} />
             )}

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { buttonClasses } from "@/components/button";
 import { Card } from "@/components/card";
 import { QueryError, QueryLoading } from "@/components/query-status";
-import { SubmissionsTable } from "@/components/submissions-table";
+import { SubmissionsSkeleton, SubmissionsTable } from "@/components/submissions-table";
 import { formatRupees } from "@/lib/format";
 import { useSignedInSession } from "@/lib/signed-in";
 import { type Earnings, loadMyPosts } from "@/lib/submissions";
@@ -39,7 +39,11 @@ export function CreatorEarnings() {
           Your posts
         </h2>
         <div className="mt-4">
-          {posts.state.status === "loading" && <QueryLoading label="Loading your posts…" />}
+          {posts.state.status === "loading" && (
+            <QueryLoading label="Loading your posts…">
+              <SubmissionsSkeleton />
+            </QueryLoading>
+          )}
           {posts.state.status === "error" && (
             <QueryError title="We couldn't load your posts" error={posts.state.error} onRetry={posts.retry} />
           )}
