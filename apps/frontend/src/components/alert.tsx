@@ -12,7 +12,6 @@ const TONES: Record<NoticeTone, string> = {
 
 interface NoticeProps extends ComponentProps<"div"> {
   tone?: NoticeTone;
-  title?: string;
 }
 
 /**
@@ -20,7 +19,7 @@ interface NoticeProps extends ComponentProps<"div"> {
  * ended session. Errors are role="alert" so screen readers announce them at once; success
  * and information are role="status". Pass ref and tabIndex={-1} to move focus to it.
  */
-export function Notice({ tone = "info", title, className = "", children, ...props }: NoticeProps) {
+export function Notice({ tone = "info", className = "", children, ...props }: NoticeProps) {
   return (
     <div
       role={tone === "error" ? "alert" : "status"}
@@ -28,10 +27,7 @@ export function Notice({ tone = "info", title, className = "", children, ...prop
       {...props}
     >
       <NoticeIcon tone={tone} />
-      <div className="min-w-0">
-        {title && <p className="font-semibold">{title}</p>}
-        {children}
-      </div>
+      <div className="min-w-0">{children}</div>
     </div>
   );
 }
